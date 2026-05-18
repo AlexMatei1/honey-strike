@@ -1,0 +1,63 @@
+{% extends "_base.html" %}
+{% block title %}Session — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="detail">
+    <p><a href="/">&larr; Back to live map</a></p>
+    <h1>Session <code id="session-id">{{ session_id }}</code></h1>
+    <div class="detail-actions">
+      <a class="action-btn" href="/sessions/{{ session_id }}/replay">🎬 Replay session</a>
+      <button id="block-src-btn" class="action-btn danger" type="button" hidden>🚫 Block source IP (5 min)</button>
+      <span id="block-result" class="muted"></span>
+    </div>
+    <div id="detail-status" class="muted">Loading…</div>
+    <div id="detail-grid" hidden>
+      <div class="detail-card">
+        <h2>Source</h2>
+        <table class="kv">
+          <tr><th>IP</th><td data-key="src_ip"></td></tr>
+          <tr><th>Country</th><td data-key="country"></td></tr>
+          <tr><th>ASN</th><td data-key="asn"></td></tr>
+          <tr><th>Organisation</th><td data-key="org"></td></tr>
+          <tr><th>AbuseIPDB</th><td data-key="abuse_score"></td></tr>
+        </table>
+      </div>
+      <div class="detail-card">
+        <h2>Session</h2>
+        <table class="kv">
+          <tr><th>Service</th><td data-key="service"></td></tr>
+          <tr><th>State</th><td data-key="state"></td></tr>
+          <tr><th>Threat score</th><td data-key="threat_score"></td></tr>
+          <tr><th>Severity</th><td data-key="severity"></td></tr>
+          <tr><th>Started</th><td data-key="started_at"></td></tr>
+          <tr><th>Duration (ms)</th><td data-key="duration_ms"></td></tr>
+          <tr><th>Event count</th><td data-key="event_count"></td></tr>
+        </table>
+      </div>
+      <div class="detail-card">
+        <h2>Tool signatures</h2>
+        <ul id="tool-signatures" class="bullet"></ul>
+      </div>
+      <div class="detail-card">
+        <h2>MITRE TTPs</h2>
+        <table class="kv">
+          <thead><tr><th>ID</th><th>Technique</th><th>Tactic</th><th>Confidence</th></tr></thead>
+          <tbody id="ttp-tbody"></tbody>
+        </table>
+      </div>
+      <div class="detail-card detail-wide">
+        <h2>Event preview</h2>
+        <table class="kv events">
+          <thead><tr><th>Time</th><th>Type</th><th>Payload</th></tr></thead>
+          <tbody id="events-tbody"></tbody>
+        </table>
+      </div>
+      <div class="detail-card">
+        <h2>Alerts dispatched</h2>
+        <ul id="alerts-list" class="bullet"></ul>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/session_detail.js"></script>
+{% endblock %}

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HoneyStrike — Session 0686a7ad-3268-4ce7-ba5e-d1c965fcdc59</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --bg-elev: #161b22;
+      --bg-elev-2: #1f2530;
+      --fg: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --low: #5fb878;
+      --medium: #d29922;
+      --high: #f0883e;
+      --critical: #f85149;
+      --border: #30363d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.45;
+    }
+    .container { max-width: 980px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 4px 0; font-size: 1.4rem; }
+    h2 { font-size: 1.05rem; margin: 0 0 8px 0; }
+    .muted { color: var(--muted); font-size: 0.85rem; }
+    code, pre { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; }
+    pre { background: var(--bg-elev-2); padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; }
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .score-pill {
+      display: inline-block; padding: 4px 12px; border-radius: 999px;
+      font-weight: 700; color: #0b1322; font-size: 0.95rem;
+    }
+    .score-low      { background: var(--low); }
+    .score-medium   { background: var(--medium); }
+    .score-high     { background: var(--high); }
+    .score-critical { background: var(--critical); color: #fff; }
+    details {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    details > summary {
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    details > summary::after { content: " ▾"; color: var(--muted); }
+    details[open] > summary::after { content: " ▴"; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; width: 30%; }
+    .kv td { font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+    .footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <div>
+        <h1>HoneyStrike threat-intel report</h1>
+        <div class="muted">Session <code>0686a7ad-3268-4ce7-ba5e-d1c965fcdc59</code> &middot; generated 2026-05-17T16:56:11+00:00</div>
+      </div>
+      <div class="score-pill score-critical">CRITICAL &middot; 82/100</div>
+    </header>
+
+    <details open>
+      <summary>Source</summary>
+      <table class="kv">
+        <tr><th>IP</th><td><code>172.21.0.13</code></td></tr>
+        <tr><th>Country</th><td>—</td></tr>
+        <tr><th>City</th><td>—</td></tr>
+        <tr><th>ASN</th><td>—</td></tr>
+        <tr><th>AbuseIPDB score</th><td>—</td></tr>
+        <tr><th>JA3</th><td>—</td></tr>
+      </table>
+    </details>
+
+    <details open>
+      <summary>Session</summary>
+      <table class="kv">
+        <tr><th>Service</th><td>ssh</td></tr>
+        <tr><th>State</th><td>CLOSED</td></tr>
+        <tr><th>Threat score</th><td>82/100 (critical)</td></tr>
+        <tr><th>Started</th><td>2026-05-17T16:17:04+00:00</td></tr>
+        <tr><th>Ended</th><td>2026-05-17T16:17:05+00:00</td></tr>
+        <tr><th>Duration</th><td>861 ms</td></tr>
+        <tr><th>Event count</th><td>4</td></tr>
+        <tr><th>Timing pattern</th><td>burst (4848.88 rpm)</td></tr>
+      </table>
+    </details>
+
+    <details open>
+      <summary>Tool signatures</summary>
+        <table>
+          <thead><tr><th style="width:auto">Name</th><th style="width:30%">Confidence</th></tr></thead>
+          <tbody>
+              <tr><td>Masscan / port-scan</td><td>0.95</td></tr>
+          </tbody>
+        </table>
+    </details>
+
+    <details open>
+      <summary>MITRE ATT&amp;CK attribution</summary>
+        <table>
+          <thead><tr><th style="width:18%">Technique</th><th>Name</th><th style="width:25%">Tactic</th><th style="width:15%">Confidence</th></tr></thead>
+          <tbody>
+              <tr>
+                <td><code>T1595.001</code></td>
+                <td>Active Scanning: Scanning IP Blocks</td>
+                <td>Reconnaissance</td>
+                <td>0.95</td>
+              </tr>
+              <tr>
+                <td><code>T1078</code></td>
+                <td>Valid Accounts</td>
+                <td>Defense Evasion</td>
+                <td>0.90</td>
+              </tr>
+              <tr>
+                <td><code>T1592</code></td>
+                <td>Gather Victim Host Information</td>
+                <td>Reconnaissance</td>
+                <td>0.65</td>
+              </tr>
+          </tbody>
+        </table>
+    </details>
+
+    <details>
+      <summary>Event preview (4 of 4)</summary>
+        <table>
+          <thead><tr><th style="width:18%">Time</th><th style="width:22%">Type</th><th>Payload</th></tr></thead>
+          <tbody>
+              <tr>
+                <td>2026-05-17T16:17:05+00:00</td>
+                <td>SSH_BANNER_GRAB</td>
+                <td><pre>{&#34;kex_algorithm&#34;: &#34;curve25519-sha256@libssh.org&#34;, &#34;client_version&#34;: &#34;SSH-2.0-paramiko_3.5.1&#34;}</pre></td>
+              </tr>
+              <tr>
+                <td>2026-05-17T16:17:05+00:00</td>
+                <td>SSH_AUTH_ATTEMPT</td>
+                <td><pre>{&#34;success&#34;: true, &#34;password&#34;: &#34;hunter2&#34;, &#34;username&#34;: &#34;root&#34;, &#34;auth_type&#34;: &#34;password&#34;, &#34;attempt_number&#34;: 1, &#34;ip_attempt_number&#34;: 5}</pre></td>
+              </tr>
+              <tr>
+                <td>2026-05-17T16:17:05+00:00</td>
+                <td>SSH_COMMAND</td>
+                <td><pre>{&#34;raw&#34;: &#34;whoami&#34;, &#34;tokens&#34;: [&#34;whoami&#34;]}</pre></td>
+              </tr>
+              <tr>
+                <td>2026-05-17T16:17:05+00:00</td>
+                <td>SSH_COMMAND</td>
+                <td><pre>{&#34;raw&#34;: &#34;exit&#34;, &#34;tokens&#34;: [&#34;exit&#34;]}</pre></td>
+              </tr>
+          </tbody>
+        </table>
+    </details>
+
+    <details>
+      <summary>Alerts dispatched</summary>
+        <table>
+          <thead><tr><th style="width:18%">Channel</th><th style="width:18%">Severity</th><th>When</th></tr></thead>
+          <tbody>
+              <tr><td>log</td><td>critical</td><td>2026-05-17T16:17:05+00:00</td></tr>
+          </tbody>
+        </table>
+    </details>
+
+    <p class="footer">HoneyStrike — generated 2026-05-17T16:56:11+00:00</p>
+  </main>
+</body>
+</html>

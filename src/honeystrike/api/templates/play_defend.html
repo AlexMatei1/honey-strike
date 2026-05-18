@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Defend — HoneyStrike Play{% endblock %}
+{% block content %}
+  <section class="play-page">
+    <header class="page-header">
+      <h1>🛡️ Learn to defend</h1>
+      <a class="muted" href="/play">&larr; back to Play</a>
+    </header>
+
+    <div class="lesson-grid hub">
+      <div>
+        <p class="muted">Each lesson teaches one detection rule. You'll type the rule
+           body line by line, then run the reference rule against a fixture session
+           to see it fire (or not). Prefer the old live arena? It's still here:
+           <a href="/play/defend/arena">▶ Live arena (label &amp; block)</a>.</p>
+        <div id="hub-list" class="lesson-card-grid">
+          <p class="muted">Loading lessons…</p>
+        </div>
+      </div>
+      {% include "_mascot.html" %}
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/play_defend_hub.js"></script>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "_base.html" %}
+{% block title %}War Room — HoneyStrike{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+{% endblock %}
+{% block content %}
+  <section class="warroom" id="warroom">
+    <div class="warroom-row warroom-stats">
+      <div class="war-stat"><span class="label">SESSIONS / 1h</span><span class="value" data-key="total_sessions">—</span></div>
+      <div class="war-stat"><span class="label">UNIQUE IPs</span><span class="value" data-key="unique_ips">—</span></div>
+      <div class="war-stat"><span class="label">AVG SCORE</span><span class="value" data-key="avg_threat_score">—</span></div>
+      <div class="war-stat"><span class="label">CRITICAL</span><span class="value alarm" data-key="critical">—</span></div>
+      <div class="war-stat"><span class="label">ALERTS</span><span class="value" data-key="alerts">—</span></div>
+      <div class="war-stat"><span class="label">BLOCKED</span><span class="value" data-key="blocked">—</span></div>
+    </div>
+
+    <div class="warroom-row warroom-main">
+      <div id="war-map" class="war-map"></div>
+      <div class="war-ticker">
+        <h2>🎟 Attack feed</h2>
+        <ol id="war-ticker-list"></ol>
+      </div>
+    </div>
+
+    <div class="warroom-row warroom-bottom">
+      <div class="war-pane">
+        <h2>🎯 Top attackers (24h)</h2>
+        <table class="kv">
+          <thead><tr><th>IP</th><th>Sessions</th><th>Max score</th></tr></thead>
+          <tbody id="war-top-attackers"><tr><td colspan="3" class="muted">…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="war-pane">
+        <h2>🧬 Top MITRE TTPs (24h)</h2>
+        <table class="kv">
+          <thead><tr><th>ID</th><th>Name</th><th>Count</th></tr></thead>
+          <tbody id="war-top-ttps"><tr><td colspan="3" class="muted">…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/warroom.js"></script>
+{% endblock %}

@@ -1,0 +1,312 @@
+# =============================================================================
+# HoneyStrike — Development Compose stack
+#
+# Honeypot ports remap to high host ports on Windows (privileged ports need
+# admin elevation). Connect to the SSH honeypot from the host with:
+#     ssh -p 2222 root@localhost
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose -f docker-compose.dev.yml up -d postgres redis
+#   docker compose -f docker-compose.dev.yml run --rm app alembic upgrade head
+#   docker compose -f docker-compose.dev.yml up -d ssh-honeypot
+# =============================================================================
+
+x-app-base: &app-base
+  build:
+    context: .
+    dockerfile: Dockerfile.dev
+  image: honeystrike-dev:latest
+  env_file: .env
+  volumes:
+    - ./:/app
+    - report_files:/reports
+    - maxmind_db:/maxmind
+    - ssh_host_keys:/var/lib/honeystrike/ssh
+  working_dir: /app
+  environment:
+    PYTHONPATH: /app/src
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: honeystrike-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-honeystrike}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-honeystrike}
+      POSTGRES_DB: ${POSTGRES_DB:-honeystrike}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honeystrike} -d ${POSTGRES_DB:-honeystrike}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: honeystrike-cache
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "900 1"
+      - --save
+      - "300 10"
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # `app` is a one-shot toolbox container: alembic, pytest, ad-hoc python.
+  # `docker compose run --rm app <cmd>`
+  # ---------------------------------------------------------------------------
+  app:
+    <<: *app-base
+    container_name: honeystrike-app
+    profiles: ["toolbox"]
+    command: ["sleep", "infinity"]
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Fingerprint worker (Phase 3) — consumes the event stream, enriches with
+  # geo/AbuseIPDB/tool-signatures, writes `fingerprints` rows.
+  # ---------------------------------------------------------------------------
+  fingerprint-worker:
+    <<: *app-base
+    container_name: honeystrike-fingerprint
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.workers.intel.fingerprint"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      WORKER_CONSUMER_NAME: fp-dev
+      # Dev: align the alert threshold with the severity-bucket boundary so a
+      # single high-severity attack reliably triggers the e2e alert pipeline.
+      ALERT_THRESHOLD_HIGH: "50"
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Lobby (Phase 6) — multiplayer invite-code matchmaking + Discord summary.
+  # Standalone FastAPI + SQLite. Host any one friend's VPS.
+  # Host port 8002 → container port 8002.
+  # ---------------------------------------------------------------------------
+  lobby:
+    <<: *app-base
+    container_name: honeystrike-lobby
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.lobby"]
+    environment:
+      PYTHONPATH: /app/src
+      LOBBY_LISTEN_PORT: "8002"
+      LOBBY_DB_PATH: /data/lobby.db
+    # YAML list merge replaces, doesn't union — re-list the source mount.
+    volumes:
+      - ./:/app
+      - lobby_data:/data
+    ports:
+      - "${LOBBY_HOST_PORT:-8002}:8002"
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Dashboard API (Phase 4 Week 11) — read-only FastAPI for the dashboard.
+  # Host port 8001 → container port 8000.
+  # ---------------------------------------------------------------------------
+  dashboard-api:
+    <<: *app-base
+    container_name: honeystrike-api
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.api"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      API_LISTEN_HOST: "0.0.0.0"
+      API_LISTEN_PORT: "8000"
+    ports:
+      - "${DASHBOARD_API_HOST_PORT:-8001}:8000"
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Report worker (Phase 4 Week 14) — consumes honeystrike:report_jobs, renders
+  # PDF/HTML reports under /reports, persists `reports` rows.
+  # ---------------------------------------------------------------------------
+  report-worker:
+    <<: *app-base
+    container_name: honeystrike-reports
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.workers.reports.worker"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      WORKER_CONSUMER_NAME: report-dev
+      REPORTS_DIR: /reports
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Alerting worker (Phase 3 Week 10) — consumes honeystrike:alerts, dispatches
+  # to enabled channels (Telegram/email/Slack/log), persists `alerts` rows.
+  # ---------------------------------------------------------------------------
+  alerting-worker:
+    <<: *app-base
+    container_name: honeystrike-alerting
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.workers.alerting.worker"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      WORKER_CONSUMER_NAME: alert-dev
+    networks:
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # SSH honeypot listener
+  # Host port 2222 → container port 22 (Paramiko server).
+  # ---------------------------------------------------------------------------
+  ssh-honeypot:
+    <<: *app-base
+    container_name: honeystrike-ssh
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.ssh"]
+    ports:
+      - "${HONEYPOT_SSH_HOST_PORT:-2222}:22"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # FTP honeypot (pyftpdlib)
+  # Host port 2221 → container port 21. Passive data ports 30000-30009 are
+  # exposed 1:1 so passive transfers (LIST/RETR/STOR) can complete.
+  # ---------------------------------------------------------------------------
+  ftp-honeypot:
+    <<: *app-base
+    container_name: honeystrike-ftp
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.ftp"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      FTP_LISTEN_PORT: "21"
+      FTP_PASSIVE_PORT_FROM: "30000"
+      FTP_PASSIVE_PORT_TO: "30009"
+    # Note: passive data ports are NOT exposed. LIST/RETR/STOR commands are
+    # captured BEFORE the data channel timeout, which is the only data we want.
+    ports:
+      - "${HONEYPOT_FTP_HOST_PORT:-2221}:21"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # TLS-fingerprint honeypot (Phase 5 stretch)
+  # Host port 8443 → container port 443. Reads ClientHello, computes JA3,
+  # closes cleanly with a close_notify alert.
+  # ---------------------------------------------------------------------------
+  tls-honeypot:
+    <<: *app-base
+    container_name: honeystrike-tls
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.tls_sniffer"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      TLS_LISTEN_PORT: "443"
+    ports:
+      - "${HONEYPOT_TLS_HOST_PORT:-8443}:443"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # RDP honeypot (asyncio raw socket)
+  # Host port 33389 → container port 3389. Parses CR PDU + mstshash cookie.
+  # ---------------------------------------------------------------------------
+  rdp-honeypot:
+    <<: *app-base
+    container_name: honeystrike-rdp
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.rdp"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      RDP_LISTEN_PORT: "3389"
+    ports:
+      - "${HONEYPOT_RDP_HOST_PORT:-33389}:3389"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # HTTP honeypot listener
+  # Host port 8080 → container port 80 (FastAPI fake admin panels).
+  # ---------------------------------------------------------------------------
+  http-honeypot:
+    <<: *app-base
+    container_name: honeystrike-http
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.http"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      HTTP_LISTEN_PORT: "80"
+    ports:
+      - "${HONEYPOT_HTTP_HOST_PORT:-8080}:80"
+    networks:
+      - honeypot-net
+      - internal-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  report_files:
+  maxmind_db:
+  ssh_host_keys:
+  lobby_data:
+
+networks:
+  internal-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+  honeypot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

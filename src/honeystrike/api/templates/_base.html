@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}HoneyStrike{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐝</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand">HoneyStrike <span class="brand-tail">/v1</span></a>
+    <span class="spacer"></span>
+
+    <button type="button" class="cmdk-trigger" id="cmdk-trigger">
+      <span>Search & commands</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+
+    <span class="xp-badge" id="xp-badge" title="HoneyStrike XP — earn it by completing lessons, grading detections, and blocking attackers.">
+      <span class="xp-icon">⚡</span><span class="xp-value" id="xp-value">0</span> XP
+      <span class="xp-streak" id="xp-streak" hidden>🔥<span id="xp-streak-value">0</span></span>
+    </span>
+
+    <a href="/profile" class="topbar-avatar" data-nav="profile" title="Profile">👤</a>
+    <button id="logout-btn" type="button">Logout</button>
+
+    {# Legacy nav — kept (hidden via CSS) for any anchor still pointed at it. #}
+    <nav aria-hidden="true">
+      <a href="/" data-nav="dashboard">Live</a>
+      <a href="/sessions" data-nav="sessions">Sessions</a>
+      <a href="/analytics" data-nav="analytics">Analytics</a>
+      <a href="/play" data-nav="play">Play</a>
+      <a href="/warroom" data-nav="warroom">War Room</a>
+      <a href="/profile" data-nav="profile">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  {# Floating bottom dock — primary navigation. #}
+  <nav class="dock" id="dock" aria-label="Primary">
+    <a href="/"          class="dock-btn" data-dock="dashboard" title="Live map">🗺<span class="dock-label">Live map</span></a>
+    <a href="/sessions"  class="dock-btn" data-dock="sessions"  title="Sessions">📋<span class="dock-label">Sessions</span></a>
+    <a href="/analytics" class="dock-btn" data-dock="analytics" title="Analytics">📊<span class="dock-label">Analytics</span></a>
+    <span class="dock-divider"></span>
+    <a href="/play"      class="dock-btn" data-dock="play"      title="Play">🎮<span class="dock-label">Play</span></a>
+    <a href="/warroom"   class="dock-btn" data-dock="warroom"   title="War room">📡<span class="dock-label">War room</span></a>
+    <span class="dock-divider"></span>
+    <a href="/profile"   class="dock-btn" data-dock="profile"   title="Profile">👤<span class="dock-label">Profile</span></a>
+    <button type="button" class="dock-btn" id="dock-cmdk" title="Commands (Ctrl+K)">⌘<span class="dock-label">Commands · Ctrl K</span></button>
+  </nav>
+
+  {# Command-palette overlay (filled by command_palette.js). #}
+  <div class="cmdk-overlay" id="cmdk-overlay" hidden>
+    <div class="cmdk-card">
+      <div class="cmdk-input-wrap">
+        <input id="cmdk-input" type="text" placeholder="Type to jump anywhere — pages, sessions, lessons, scenarios…" autocomplete="off" spellcheck="false">
+      </div>
+      <ul class="cmdk-list" id="cmdk-list"></ul>
+    </div>
+  </div>
+
+  {% if not hide_mini_mascot %}
+    {% include "_mascot_mini.html" %}
+  {% endif %}
+
+  <script src="/static/auth.js"></script>
+  <script src="/static/mascot_mini.js"></script>
+  <script src="/static/threat_border.js"></script>
+  <script src="/static/command_palette.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

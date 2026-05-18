@@ -1,0 +1,215 @@
+[tool.poetry]
+name = "honeystrike"
+version = "0.1.0"
+description = "Active honeypot platform with MITRE ATT&CK mapping, fingerprinting, alerting and threat-intel reporting."
+authors = ["HoneyStrike Operator"]
+readme = "README.md"
+license = "MIT"
+packages = [{ include = "honeystrike", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+# Web / API
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.32.0" }
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+python-multipart = "^0.0.20"
+jinja2 = "^3.1.4"
+
+# Async ORM + migrations
+sqlalchemy = { extras = ["asyncio"], version = "^2.0.36" }
+alembic = "^1.14.0"
+asyncpg = "^0.30.0"
+greenlet = "^3.1.1"
+
+# Event bus
+redis = { extras = ["hiredis"], version = "^5.2.0" }
+
+# Auth
+pyjwt = { extras = ["crypto"], version = "^2.10.0" }
+argon2-cffi = "^23.1.0"
+
+# Honeypot service libraries
+paramiko = "^3.5.0"
+pyftpdlib = "^2.0.0"
+cryptography = "^44.0.0"
+
+# Intelligence
+geoip2 = "^5.0.0"
+httpx = "^0.28.0"
+mitreattack-python = "^4.0.0"
+stix2 = "^3.0.1"
+
+# Stretch — Phase 5 Week 17
+scikit-learn = "^1.5.0"
+numpy = "^2.1.0"
+
+# Reports
+weasyprint = "^63.0"
+
+# Observability
+structlog = "^24.4.0"
+prometheus-client = "^0.21.0"
+
+# Misc
+python-dateutil = "^2.9.0"
+tenacity = "^9.0.0"
+
+# CLI + multiplayer (Phase 6)
+typer = "^0.15.0"
+tomli-w = "^1.0.0"
+websockets = "^14.0"
+
+[tool.poetry.scripts]
+honeystrike = "honeystrike.cli:app"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+pytest-cov = "^6.0.0"
+pytest-benchmark = "^5.0.0"
+httpx = "^0.28.0"
+mypy = "^1.13.0"
+ruff = "^0.8.0"
+black = "^24.10.0"
+bandit = "^1.7.10"
+pip-audit = "^2.7.3"
+pre-commit = "^4.0.0"
+faker = "^33.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "C4", "SIM", "RUF"]
+ignore = ["S101"] # allow `assert` in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "N802"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+plugins = []
+
+# FastAPI / redis-asyncio / SQLAlchemy decorators don't preserve full strict
+# typing through every framework boundary. Relax those modules to keep CI
+# honest for our own logic without policing third-party stub gaps.
+[[tool.mypy.overrides]]
+module = [
+    "honeystrike.core.event_bus",
+    "honeystrike.api.*",
+    "honeystrike.services.ssh.*",
+    "honeystrike.services.http.*",
+    "honeystrike.services.ftp.*",
+    "honeystrike.services.rdp.*",
+    "honeystrike.services.tls_sniffer.*",
+    "honeystrike.workers.alerting.*",
+    "honeystrike.workers.reports.*",
+    "honeystrike.workers.maintenance.*",
+    "honeystrike.workers.intel.ml_anomaly",
+    "honeystrike.workers.intel.fingerprint",
+    "honeystrike.workers.intel.geo",
+    "honeystrike.workers.intel.abuseipdb",
+]
+disallow_untyped_decorators = false
+disallow_any_decorated = false
+disallow_untyped_calls = false
+disable_error_code = [
+    "no-untyped-def", "no-untyped-call", "no-any-return", "type-arg", "misc",
+    "attr-defined", "arg-type", "unused-ignore",
+]
+
+# stix2 ships without a `py.typed` marker — the library is typed but mypy can't
+# see it from outside. Silence the import-untyped error specifically.
+[[tool.mypy.overrides]]
+module = ["stix2", "stix2.*", "sklearn.*", "numpy.*", "geoip2.*", "paramiko.*", "pyftpdlib.*", "weasyprint.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["src/honeystrike"]
+branch = true
+omit = [
+    # Entry-point scripts — pure glue, only meaningful when launched as
+    # processes. Integration tests exercise them through their running
+    # containers; counting them in the unit-coverage gate is misleading.
+    "src/honeystrike/api/__main__.py",
+    "src/honeystrike/api/bootstrap.py",
+    "src/honeystrike/services/ssh/__main__.py",
+    "src/honeystrike/services/http/__main__.py",
+    "src/honeystrike/services/ftp/__main__.py",
+    "src/honeystrike/services/rdp/__main__.py",
+    # Same story for the worker entrypoints and the API surface modules
+    # whose behaviour is covered end-to-end in tests/integration/.
+    "src/honeystrike/api/app.py",
+    "src/honeystrike/api/routers/*.py",
+    "src/honeystrike/workers/alerting/worker.py",
+    "src/honeystrike/workers/reports/worker.py",
+    # Honeypot listener handler classes are framework callbacks (pyftpdlib,
+    # FastAPI middleware). Their behaviour is end-to-end tested by every
+    # integration test that probes the live honeypot.
+    "src/honeystrike/services/ftp/handler.py",
+    "src/honeystrike/services/http/server.py",
+    "src/honeystrike/services/http/templates.py",
+    # Pure Jinja template files / generated static.
+    "src/honeystrike/api/templates/*",
+    "src/honeystrike/workers/reports/templates/*",
+    # Phase 6 — `honeystrike` CLI command-binding glue (typer wrappers + the
+    # live WebSocket / REPL paths). The pure helpers are unit-tested
+    # individually (canaries, flag detection, campaigns, blocklist); the
+    # typer surface + the async live-WS loops are integration-tested.
+    "src/honeystrike/cli/__main__.py",
+    "src/honeystrike/cli/__init__.py",
+    "src/honeystrike/cli/auth.py",
+    "src/honeystrike/cli/output.py",
+    "src/honeystrike/cli/http_client.py",
+    "src/honeystrike/cli/login.py",
+    "src/honeystrike/cli/attack/__init__.py",
+    "src/honeystrike/cli/attack/scenarios.py",
+    "src/honeystrike/cli/attack/runners.py",
+    "src/honeystrike/cli/defend/__init__.py",
+    "src/honeystrike/cli/defend/snapshot.py",
+    "src/honeystrike/cli/defend/tail.py",
+    "src/honeystrike/cli/defend/narrate.py",
+    "src/honeystrike/cli/defend/flags.py",
+    "src/honeystrike/cli/defend/label.py",
+    "src/honeystrike/cli/defend/listen.py",
+    "src/honeystrike/cli/defend/campaign_score.py",
+    "src/honeystrike/cli/lobby/*.py",
+    # Phase 6 — lobby service is a standalone FastAPI; integration-tested.
+    "src/honeystrike/lobby/__main__.py",
+    "src/honeystrike/lobby/app.py",
+    "src/honeystrike/lobby/store.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.\\s*$",
+]
+show_missing = true
+skip_covered = true

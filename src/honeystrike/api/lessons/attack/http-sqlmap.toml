@@ -1,0 +1,56 @@
+id = "http-sqlmap"
+family = "attack"
+title = "sqlmap-style SQL injection probe"
+blurb = "Send a UNION-SELECT payload that screams 'I am sqlmap' from the User-Agent header."
+ttps = ["T1190"]
+difficulty = "easy"
+typing_model = "cli"
+
+briefing = """
+**MITRE ATT&CK:** T1190 — *Exploit Public-Facing Application*
+
+sqlmap is a Python tool that automates SQL injection testing. It probes a
+URL parameter with a battery of payloads (UNION-based, boolean-based,
+time-based) and reports which ones make the backend misbehave.
+
+We don't actually run sqlmap in this lesson — we type one representative
+request the way `curl` would send it. Two things give the defender a clean
+T1190 hit:
+
+1. **User-Agent**: the default `sqlmap/1.7.8#stable` UA is hard-coded into
+   sqlmap unless you pass `--random-agent`. The HTTP honeypot reads it and
+   sets `scanner_detected: "sqlmap"` on the event.
+2. **Payload shape**: `id=1+UNION+SELECT+password+FROM+users` matches a
+   regex in [`workers/intel/anomalies.py`](src/honeystrike/workers/intel/anomalies.py)
+   that flips the `sqli_pattern` flag on the request. The
+   `_exploit_public_app_rule` (T1190) needs either `cve_signature` or
+   `sqli_pattern` to be true; this one trips on the latter.
+
+Type the curl command below. The shell prompt will show a `$`; type the
+rest exactly.
+"""
+
+[live]
+scenario = "http-sqlmap"
+default_target = "http-honeypot:80"
+
+[[blocks]]
+kind = "prose"
+text = "We're typing the full curl invocation. Three flags: silent, custom User-Agent, and the target URL with the injection payload baked into the query string."
+
+[[blocks]]
+kind = "shell"
+target = "curl -s -A 'sqlmap/1.7.8#stable' 'http://http-honeypot:80/wp-admin/index.php?id=1+UNION+SELECT+password+FROM+users'"
+annotation = "-s silences progress output. -A sets the User-Agent. The URL is single-quoted so the shell leaves the + signs alone."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why does the User-Agent matter? The backend would still execute the SQL."
+options = [
+  "It doesn't — the payload alone is enough",
+  "It's how the honeypot tells real users from scanners and sets scanner_detected",
+  "It changes the encoding of the URL",
+  "It triggers a different SQL injection path",
+]
+correct = 1
+explanation = "The honeypot tags scanner_detected from a UA dictionary. That tag boosts the threat score and feeds tool fingerprinting."

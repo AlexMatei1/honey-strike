@@ -1,0 +1,64 @@
+{% extends "_base.html" %}
+{% block title %}Sessions — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <h1>Sessions</h1>
+    <form id="filters" class="filters">
+      <label>Service
+        <select name="service">
+          <option value="">All</option>
+          <option value="ssh">ssh</option>
+          <option value="http">http</option>
+          <option value="ftp">ftp</option>
+          <option value="rdp">rdp</option>
+        </select>
+      </label>
+      <label>Min score
+        <input type="number" name="min_score" min="0" max="100" step="1" placeholder="e.g. 50">
+      </label>
+      <label>From
+        <input type="datetime-local" name="from_ts">
+      </label>
+      <label>To
+        <input type="datetime-local" name="to_ts">
+      </label>
+      <label>Per page
+        <select name="limit">
+          <option>25</option>
+          <option selected>50</option>
+          <option>100</option>
+          <option>200</option>
+        </select>
+      </label>
+      <button type="submit">Apply</button>
+      <button type="reset" id="filters-reset">Clear</button>
+    </form>
+  </section>
+
+  <div class="table-card">
+    <div class="table-meta">
+      <span id="meta-summary" class="muted">Loading…</span>
+      <span id="pager" class="pager"></span>
+    </div>
+    <table class="sessions sessions-full">
+      <thead>
+        <tr>
+          <th>Started</th>
+          <th>Service</th>
+          <th>Source IP</th>
+          <th>Country</th>
+          <th>State</th>
+          <th>Duration</th>
+          <th>TTPs</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="sessions-full-tbody">
+        <tr><td colspan="8" class="muted">No sessions loaded yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/sessions.js"></script>
+{% endblock %}

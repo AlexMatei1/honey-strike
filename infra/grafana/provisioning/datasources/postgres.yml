@@ -1,0 +1,25 @@
+# Grafana datasource provisioning for the HoneyStrike DB.
+#
+# Drop this file into `/etc/grafana/provisioning/datasources/postgres.yml` on
+# the Grafana instance, and the dashboard at
+# `infra/grafana/dashboards/honeystrike-overview.json` will populate on import.
+#
+# All secrets come from the Grafana env: DS_POSTGRES_PASSWORD must be set.
+
+apiVersion: 1
+
+datasources:
+  - name: Postgres
+    type: postgres
+    uid: Postgres
+    access: proxy
+    url: ${POSTGRES_HOST:-honeystrike-db}:${POSTGRES_PORT:-5432}
+    database: ${POSTGRES_DB:-honeystrike}
+    user: ${POSTGRES_USER:-honeystrike}
+    secureJsonData:
+      password: ${DS_POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    editable: false

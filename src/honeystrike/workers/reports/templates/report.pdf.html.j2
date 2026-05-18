@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HoneyStrike — Session {{ session.id }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+      @bottom-center {
+        content: "HoneyStrike threat-intel report  ·  page " counter(page) " of " counter(pages);
+        font-family: "DejaVu Sans", sans-serif;
+        font-size: 8pt;
+        color: #555;
+      }
+    }
+    body {
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 10pt;
+      color: #1c1c20;
+      line-height: 1.4;
+    }
+    h1 { font-size: 18pt; margin: 0 0 4pt 0; }
+    h2 {
+      font-size: 12pt;
+      margin: 16pt 0 6pt 0;
+      padding-bottom: 2pt;
+      border-bottom: 1pt solid #ccc;
+    }
+    code, pre {
+      font-family: "DejaVu Sans Mono", monospace;
+      font-size: 9pt;
+    }
+    pre {
+      background: #f3f4f6;
+      padding: 4pt 6pt;
+      border-radius: 3pt;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12pt;
+    }
+    .muted { color: #555; font-size: 9pt; }
+    .score-pill {
+      padding: 4pt 10pt;
+      border-radius: 999px;
+      font-weight: bold;
+      font-size: 10pt;
+      color: #fff;
+    }
+    .score-low      { background: #4f8a4f; }
+    .score-medium   { background: #c9881a; }
+    .score-high     { background: #d96c25; }
+    .score-critical { background: #c1392b; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 4pt 6pt;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 0.5pt solid #ddd;
+    }
+    th { color: #444; font-weight: 600; }
+    .kv th { width: 30%; }
+    .footer {
+      font-size: 8pt;
+      color: #777;
+      margin-top: 14pt;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>HoneyStrike threat-intel report</h1>
+      <div class="muted">Session <code>{{ session.id }}</code></div>
+      <div class="muted">Generated {{ generated_at }}</div>
+    </div>
+    <div class="score-pill score-{{ session.severity }}">{{ session.severity|upper }} · {{ session.threat_score }}/100</div>
+  </div>
+
+  <h2>Source</h2>
+  <table class="kv">
+    <tr><th>IP</th><td><code>{{ session.src_ip }}</code></td></tr>
+    {% if fingerprint %}
+      <tr><th>Country</th><td>{{ fingerprint.country_iso or '—' }}{% if fingerprint.country_name %} — {{ fingerprint.country_name }}{% endif %}</td></tr>
+      <tr><th>City</th><td>{{ fingerprint.city or '—' }}</td></tr>
+      <tr><th>ASN</th><td>{% if fingerprint.asn %}AS{{ fingerprint.asn }}{% if fingerprint.org %} ({{ fingerprint.org }}){% endif %}{% else %}—{% endif %}</td></tr>
+      <tr><th>AbuseIPDB</th><td>{% if fingerprint.abuse_score is not none %}{{ fingerprint.abuse_score }}/100, {{ fingerprint.abuse_reports or 0 }} reports{% else %}—{% endif %}</td></tr>
+      <tr><th>JA3</th><td>{{ fingerprint.ja3_hash or '—' }}</td></tr>
+    {% endif %}
+  </table>
+
+  <h2>Session</h2>
+  <table class="kv">
+    <tr><th>Service</th><td>{{ session.service }}</td></tr>
+    <tr><th>State</th><td>{{ session.state }}</td></tr>
+    <tr><th>Threat score</th><td>{{ session.threat_score }}/100 ({{ session.severity }})</td></tr>
+    <tr><th>Started</th><td>{{ session.started_at }}</td></tr>
+    <tr><th>Ended</th><td>{{ session.ended_at or '—' }}</td></tr>
+    <tr><th>Duration</th><td>{% if session.duration_ms %}{{ session.duration_ms }} ms{% else %}—{% endif %}</td></tr>
+    <tr><th>Event count</th><td>{{ session.event_count }}</td></tr>
+    {% if fingerprint and fingerprint.timing_pattern %}
+      <tr><th>Timing pattern</th><td>{{ fingerprint.timing_pattern }}{% if fingerprint.attempt_rate_rpm %} ({{ fingerprint.attempt_rate_rpm }} rpm){% endif %}</td></tr>
+    {% endif %}
+  </table>
+
+  <h2>Tool signatures</h2>
+  {% if fingerprint and fingerprint.tool_signatures %}
+    <table>
+      <thead><tr><th>Name</th><th style="width:30%">Confidence</th></tr></thead>
+      <tbody>
+        {% for sig in fingerprint.tool_signatures %}
+          <tr><td>{{ sig.name }}</td><td>{{ "%.2f"|format(sig.confidence) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No tool signatures matched.</p>
+  {% endif %}
+
+  <h2>MITRE ATT&amp;CK attribution</h2>
+  {% if ttps %}
+    <table>
+      <thead><tr><th style="width:18%">Technique</th><th>Name</th><th style="width:25%">Tactic</th><th style="width:15%">Confidence</th></tr></thead>
+      <tbody>
+        {% for t in ttps %}
+          <tr>
+            <td><code>{{ t.technique_id }}</code></td>
+            <td>{{ t.technique_name }}</td>
+            <td>{{ t.tactic }}</td>
+            <td>{{ "%.2f"|format(t.confidence) }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No techniques attributed.</p>
+  {% endif %}
+
+  <h2>Event preview ({{ events|length }} of {{ session.event_count }})</h2>
+  {% if events %}
+    <table>
+      <thead><tr><th style="width:18%">Time</th><th style="width:22%">Type</th><th>Payload</th></tr></thead>
+      <tbody>
+        {% for e in events %}
+          <tr>
+            <td>{{ e.timestamp }}</td>
+            <td>{{ e.event_type }}</td>
+            <td><pre>{{ e.payload_repr }}</pre></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No events captured.</p>
+  {% endif %}
+
+  <h2>Alerts dispatched</h2>
+  {% if alerts %}
+    <table>
+      <thead><tr><th style="width:18%">Channel</th><th style="width:18%">Severity</th><th>When</th></tr></thead>
+      <tbody>
+        {% for a in alerts %}
+          <tr><td>{{ a.channel }}</td><td>{{ a.severity }}</td><td>{{ a.dispatched_at }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No alerts dispatched for this session.</p>
+  {% endif %}
+
+  <div class="footer">HoneyStrike — generated {{ generated_at }}</div>
+</body>
+</html>

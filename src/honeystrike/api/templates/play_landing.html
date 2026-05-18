@@ -1,0 +1,39 @@
+{% extends "_base.html" %}
+{% block title %}Play — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="play-landing">
+    <h1>🎮 Play HoneyStrike</h1>
+    <p class="muted">Run scripted attacks at your own honeypot, or watch them roll in and label TTPs as they fire.
+       Both modes share the same intel pipeline behind the dashboard.</p>
+
+    <div class="play-tiles">
+      <a class="play-tile play-attack" href="/play/attack">
+        <div class="play-icon">🗡️</div>
+        <h2>Attack</h2>
+        <p>Pick a scenario or campaign. Fire it at your honeypot. Watch the threat
+           score climb on the live map at the same time.</p>
+        <ul>
+          <li>10 single-protocol scenarios (SSH brute, sqlmap, Log4Shell, JA3, …)</li>
+          <li>4 adversary-emulation campaigns (APT28, FIN7, ransomware, kiddie)</li>
+          <li>Tunable: target, intensity, count</li>
+        </ul>
+      </a>
+
+      <a class="play-tile play-defend" href="/play/defend">
+        <div class="play-icon">🛡️</div>
+        <h2>Defend</h2>
+        <p>Live arena — new sessions stream in, you label each TTP as you see it.
+           Correct labels block the attacker's IP for 5 minutes.</p>
+        <ul>
+          <li>WebSocket stream of every scored session</li>
+          <li>MITRE TTP autocomplete</li>
+          <li>Live "blocked attackers" sidebar with countdown timers</li>
+        </ul>
+      </a>
+    </div>
+
+    <p class="muted">Solo? Open <code>/play/attack</code> in one tab and <code>/play/defend</code> in another.<br>
+       Two friends, two VPS? Use the <code>honeystrike</code> CLI's
+       <code>register</code> &rarr; <code>challenge</code> flow — see <a href="/api/docs">/api/docs</a> for the lobby endpoints.</p>
+  </section>
+{% endblock %}

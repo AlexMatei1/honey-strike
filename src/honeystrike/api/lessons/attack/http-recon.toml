@@ -1,0 +1,65 @@
+id = "http-recon"
+family = "attack"
+title = "HTTP recon + canary capture"
+blurb = "Probe common admin paths and accidentally exfiltrate a fake AWS key."
+ttps = ["T1592", "T1595.001"]
+difficulty = "easy"
+typing_model = "cli"
+
+briefing = """
+**MITRE ATT&CK:** T1592 (*Gather Victim Host Information*) + T1595.001
+(*Active Scanning: Scanning IP Blocks*)
+
+Recon is the cheapest phase of an attack — fire a list of common paths,
+read the responses, look for leaked secrets in the HTML/text. The HoneyStrike
+HTTP honeypot serves convincing-looking fake content for the common
+sensitive paths (`/.env`, `/.git/HEAD`, `/admin`, `/server-status`,
+`/phpmyadmin`) and seeds **three CTF-style canaries** in the responses:
+
+| Canary needle                                      | Lives in            |
+|----------------------------------------------------|---------------------|
+| `AKIA0HONEYSTRIKECANARY` (fake AWS key)            | `/.env`             |
+| `canary-user:x:9999:9999:HoneyStrike Canary:…`     | SSH `cat /etc/passwd` |
+| `hs-canary-token-deadbeefcafe`                     | `/admin` HTML comment |
+
+When you grep `events.payload` for any of these needles, you know which
+attacker session successfully read which canary — that's the
+`honeystrike defend flags-found` workflow.
+
+Type the curl one-liner that pulls `/.env` and pipes through grep. The
+honeypot will return a realistic `.env` file with the canary embedded.
+"""
+
+[live]
+scenario = "http-recon"
+default_target = "http-honeypot:80"
+
+[[blocks]]
+kind = "prose"
+text = "First, fetch the .env file the way a recon tool would — silently, with a Nikto User-Agent so the honeypot tags us correctly."
+
+[[blocks]]
+kind = "shell"
+target = "curl -s -A 'Nikto/2.5.0' http://http-honeypot:80/.env"
+annotation = "/.env in the wild leaks DB passwords. The honeypot returns a fake one with AKIA0HONEYSTRIKECANARY embedded — that's the flag for this lesson."
+
+[[blocks]]
+kind = "prose"
+text = "Now hit /admin and grep the HTML for the hidden token comment."
+
+[[blocks]]
+kind = "shell"
+target = "curl -s http://http-honeypot:80/admin | grep -oE 'hs-canary-token-[a-f0-9]+'"
+annotation = "The fake admin login page hides the canary in an HTML comment. grep -oE prints only the matched needle."
+
+[[blocks]]
+kind = "choice"
+prompt = "On the defender side, how does `honeystrike defend flags-found` know you grabbed a canary?"
+options = [
+  "It tails your terminal",
+  "It scans events.payload for the canary needle strings",
+  "It looks at TCP packet counts",
+  "The honeypot calls home when canaries are read",
+]
+correct = 1
+explanation = "Every HTTP response body the honeypot returns is recorded in the event payload. Defender-side SQL/Python just greps that payload column for known canary needles."

@@ -1,0 +1,56 @@
+{% extends "_base.html" %}
+{% block title %}Session replay — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="replay-page">
+    <header class="page-header">
+      <h1>🎬 Replay session <code id="session-id">{{ session_id }}</code></h1>
+      <a class="muted" href="/sessions/{{ session_id }}">&larr; back to detail</a>
+    </header>
+
+    <div class="replay-toolbar">
+      <button id="play-btn" type="button">▶ Play</button>
+      <button id="pause-btn" type="button" disabled>⏸ Pause</button>
+      <button id="reset-btn" type="button">⟲ Reset</button>
+      <label>Speed
+        <select id="speed">
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="5" selected>5×</option>
+          <option value="10">10×</option>
+          <option value="25">25×</option>
+        </select>
+      </label>
+      <span id="elapsed" class="muted">00:00.000</span>
+      <span class="muted">/</span>
+      <span id="duration" class="muted">00:00.000</span>
+    </div>
+
+    <div class="replay-scrubber-wrap">
+      <input id="scrubber" type="range" min="0" max="100" step="0.1" value="0">
+    </div>
+
+    <div class="replay-stage">
+      <div class="replay-score">
+        <h2>Threat score</h2>
+        <div class="score-bar-track">
+          <div class="score-bar-fill" id="score-fill"></div>
+        </div>
+        <div class="score-callout">
+          <span id="score-value">0</span>
+          <span id="score-severity" class="muted">low</span>
+        </div>
+        <p class="muted">Last contribution: <span id="score-last">—</span></p>
+      </div>
+
+      <div class="replay-events">
+        <h2>Event log</h2>
+        <div id="event-log" class="event-log-window">
+          <p class="muted">Press ▶ Play to begin.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/replay.js"></script>
+{% endblock %}

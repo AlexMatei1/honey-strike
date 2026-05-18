@@ -1,0 +1,15 @@
+{
+  "service": "ssh",
+  "src_ip": "203.0.113.42",
+  "started_at": "2026-05-18T12:00:00Z",
+  "sibling_sessions": [],
+  "events": [
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:00Z", "payload": {"username": "root", "password": "root",     "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:00Z", "payload": {"username": "root", "password": "toor",     "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:01Z", "payload": {"username": "root", "password": "admin",    "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:01Z", "payload": {"username": "root", "password": "password", "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:02Z", "payload": {"username": "root", "password": "123456",   "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:02Z", "payload": {"username": "root", "password": "qwerty",   "granted": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T12:00:03Z", "payload": {"username": "root", "password": "letmein",  "granted": true}}
+  ]
+}

@@ -1,0 +1,43 @@
+{% extends "_base.html" %}
+{% set hide_mini_mascot = True %}
+{% block title %}Lesson — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="lesson-page" data-lesson-family="{{ family }}" data-lesson-id="{{ lesson_id }}">
+    <header class="page-header">
+      <h1 id="lesson-title">Loading…</h1>
+      <a class="muted" href="/play/{{ family }}">&larr; back to {{ family }} hub</a>
+    </header>
+
+    <div class="lesson-grid">
+      <div class="lesson-briefing" id="lesson-briefing">
+        <p class="muted">Loading briefing…</p>
+      </div>
+
+      {% include "_mascot.html" %}
+    </div>
+
+    <section class="lesson-stage">
+      <div class="lesson-code" id="lesson-code">
+        <p class="muted">Loading…</p>
+      </div>
+      <div class="lesson-annotation" id="lesson-annotation">
+        <p class="muted">Annotations appear here as you type.</p>
+      </div>
+    </section>
+
+    <footer class="lesson-footer">
+      <button id="replay-fixture-btn" type="button" disabled>↻ Replay fixture</button>
+      <button id="fire-live-btn" type="button" disabled>🚀 Fire live</button>
+      <button id="grade-btn" type="button" disabled hidden>🛡 Grade my detector</button>
+      <span class="lesson-progress muted" id="lesson-progress">0 / 0 blocks</span>
+    </footer>
+
+    <section class="lesson-output" id="lesson-output" hidden>
+      <h2>Output</h2>
+      <pre id="lesson-output-pre"></pre>
+    </section>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/lesson.js"></script>
+{% endblock %}

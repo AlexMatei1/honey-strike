@@ -1,0 +1,49 @@
+{# Reusable HoneyStrike mascot — a bee hovering over a honey pot.
+   States toggled by CSS class on the .mascot root: idle | happy | shock | cheer | sleep.
+   The speech bubble text is driven by JS. #}
+<div class="mascot-wrap">
+  <div class="mascot idle" id="mascot" aria-hidden="true">
+    <svg viewBox="0 0 120 130" xmlns="http://www.w3.org/2000/svg">
+      <!-- Honey pot -->
+      <g class="mascot-pot">
+        <ellipse cx="60" cy="115" rx="38" ry="6" fill="#000" opacity="0.25"/>
+        <path d="M 28 92 L 32 118 L 88 118 L 92 92 Z" fill="#a06a2a"/>
+        <rect x="24" y="84" width="72" height="14" rx="3" fill="#d29922"/>
+        <path d="M 32 92 Q 60 102 88 92 L 88 96 Q 60 106 32 96 Z" fill="#f0b040"/>
+      </g>
+      <!-- Bee body -->
+      <g class="mascot-bee">
+        <ellipse class="bee-shadow" cx="60" cy="60" rx="24" ry="14" fill="#000" opacity="0.08"/>
+        <ellipse class="bee-body" cx="60" cy="55" rx="22" ry="14" fill="#f0c040"/>
+        <rect x="46" y="44" width="6" height="22" fill="#111"/>
+        <rect x="58" y="44" width="6" height="22" fill="#111"/>
+        <rect x="70" y="44" width="6" height="22" fill="#111"/>
+        <!-- Wings -->
+        <ellipse class="wing wing-l" cx="50" cy="44" rx="11" ry="7" fill="#e6f0ff" opacity="0.8"/>
+        <ellipse class="wing wing-r" cx="70" cy="44" rx="11" ry="7" fill="#e6f0ff" opacity="0.8"/>
+        <!-- Face -->
+        <circle class="eye eye-l" cx="74" cy="56" r="2.4" fill="#111"/>
+        <circle class="eye eye-r" cx="82" cy="56" r="2.4" fill="#111"/>
+        <path class="mouth mouth-smile" d="M 74 62 Q 78 65 82 62" stroke="#111" stroke-width="1.6" fill="none"/>
+        <path class="mouth mouth-frown" d="M 74 63 Q 78 60 82 63" stroke="#111" stroke-width="1.6" fill="none" opacity="0"/>
+        <path class="mouth mouth-o"     d="M 76 62 Q 78 66 80 62 Q 78 60 76 62" stroke="#111" stroke-width="1.4" fill="#111" opacity="0"/>
+        <!-- Antennae -->
+        <path d="M 52 44 Q 50 36 46 34" stroke="#111" stroke-width="1.5" fill="none"/>
+        <path d="M 68 44 Q 70 36 74 34" stroke="#111" stroke-width="1.5" fill="none"/>
+        <circle cx="46" cy="34" r="1.6" fill="#111"/>
+        <circle cx="74" cy="34" r="1.6" fill="#111"/>
+      </g>
+      <!-- Sparkles + alert markers -->
+      <g class="mascot-fx">
+        <text class="fx-bang" x="60" y="22" text-anchor="middle" font-size="20" fill="#f85149" opacity="0">❗</text>
+        <text class="fx-sparkle s1" x="20" y="40" font-size="14" fill="#f0c040" opacity="0">✦</text>
+        <text class="fx-sparkle s2" x="98" y="40" font-size="14" fill="#f0c040" opacity="0">✦</text>
+        <text class="fx-sparkle s3" x="60" y="14" font-size="14" fill="#f0c040" opacity="0">✦</text>
+        <text class="fx-zzz" x="84" y="38" font-size="14" fill="#58a6ff" opacity="0">z z z</text>
+      </g>
+    </svg>
+  </div>
+  <div class="mascot-bubble" id="mascot-bubble">
+    <span id="mascot-bubble-text">Hi! Pick a line and start typing — I'll keep an eye on you.</span>
+  </div>
+</div>

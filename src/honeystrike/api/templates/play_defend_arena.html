@@ -1,0 +1,25 @@
+{% extends "_base.html" %}
+{% block title %}Defend — HoneyStrike Play{% endblock %}
+{% block content %}
+  <section class="play-page">
+    <header class="page-header">
+      <h1>🛡️ Defend arena</h1>
+      <a class="muted" href="/play">&larr; back to Play</a>
+    </header>
+
+    <div class="defend-grid">
+      <div class="defend-feed" id="defend-feed">
+        <p class="muted">Listening for new scored sessions…</p>
+      </div>
+      <aside class="defend-sidebar">
+        <h2>🚫 Blocked attackers</h2>
+        <ul id="blocked-list"><li class="muted">none</li></ul>
+        <h2 style="margin-top:18px">📋 Recent labels</h2>
+        <ul id="labels-log"><li class="muted">none</li></ul>
+      </aside>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/play_defend.js"></script>
+{% endblock %}

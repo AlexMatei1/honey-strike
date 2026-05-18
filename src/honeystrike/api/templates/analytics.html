@@ -1,0 +1,61 @@
+{% extends "_base.html" %}
+{% block title %}Analytics — HoneyStrike{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+          integrity="sha384-mYDHV+jSPdW5IPGOcLNu+iJWP/8gXjkkkmEa3v1m1mEYAOl4j7DZuJI4LiQH/pir" crossorigin="anonymous" defer></script>
+{% endblock %}
+{% block content %}
+  <section class="page-header">
+    <h1>Analytics</h1>
+    <form id="window-form" class="filters">
+      <label>Window
+        <select name="days">
+          <option value="1">Last 24 h</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </label>
+      <label>Timeline bucket
+        <select name="bucket">
+          <option value="hour" selected>Hour</option>
+          <option value="day">Day</option>
+        </select>
+      </label>
+      <button type="submit">Refresh</button>
+    </form>
+  </section>
+
+  <section class="overview" id="overview">
+    <div class="stat"><span class="label">Sessions</span><span class="value" data-key="total_sessions">—</span></div>
+    <div class="stat"><span class="label">Unique IPs</span><span class="value" data-key="unique_ips">—</span></div>
+    <div class="stat"><span class="label">Avg score</span><span class="value" data-key="avg_threat_score">—</span></div>
+    <div class="stat"><span class="label">Critical</span><span class="value" data-key="severity_critical">—</span></div>
+  </section>
+
+  <section class="analytics-grid">
+    <div class="chart-card">
+      <h2>Sessions timeline</h2>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Severity breakdown</h2>
+      <canvas id="chart-severity"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Sessions by service</h2>
+      <canvas id="chart-services"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Top MITRE techniques</h2>
+      <canvas id="chart-ttps"></canvas>
+    </div>
+    <div class="chart-card chart-wide">
+      <h2>Top source countries</h2>
+      <canvas id="chart-geo"></canvas>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/analytics.js" defer></script>
+{% endblock %}

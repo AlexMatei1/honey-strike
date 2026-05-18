@@ -1,0 +1,290 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "HoneyStrike overview — sessions, threat scoring, MITRE TTPs, geo, alerts. Requires a Postgres datasource pointed at the honeystrike DB.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FROM sessions WHERE started_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Sessions (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(distinct src_ip) FROM sessions WHERE started_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Unique IPs (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 30},
+              {"color": "orange", "value": 60},
+              {"color": "red", "value": 80}
+            ]
+          },
+          "max": 100,
+          "min": 0,
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "auto"},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coalesce(round(avg(threat_score)::numeric, 1), 0) FROM sessions WHERE started_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg threat score (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed", "fixedColor": "red"},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "id": 4,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FROM sessions WHERE severity = 'critical' AND started_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Critical (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "id": 5,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FROM alerts WHERE dispatched_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Alerts dispatched (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "id": 6,
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) FROM reports WHERE generated_at > now() - interval '24 hours'",
+          "refId": "A"
+        }
+      ],
+      "title": "Reports (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 7,
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', started_at) AS time, service AS metric, count(*) AS value FROM sessions WHERE $__timeFilter(started_at) GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Sessions per hour by service",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 8,
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', started_at) AS time, 'avg_score' AS metric, round(avg(threat_score)::numeric, 1) AS value FROM sessions WHERE $__timeFilter(started_at) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Average threat score per hour",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12},
+      "id": 9,
+      "options": {"displayLabels": ["percent"]},
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT severity, count(*) FROM sessions WHERE $__timeFilter(started_at) GROUP BY severity ORDER BY count(*) DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Severity breakdown",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12},
+      "id": 10,
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT t.technique_id || ' — ' || t.technique_name AS technique, count(*) AS count FROM ttp_matches t JOIN sessions s ON s.id = t.session_id WHERE $__timeFilter(s.started_at) GROUP BY 1 ORDER BY count DESC LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Top MITRE techniques",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+      "id": 11,
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT coalesce(f.country_iso, '??') AS country, count(*) AS sessions FROM fingerprints f JOIN sessions s ON s.id = f.session_id WHERE $__timeFilter(s.started_at) GROUP BY 1 ORDER BY sessions DESC LIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "title": "Top source countries",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "id": 12,
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT s.src_ip AS ip, count(*) AS sessions, max(s.threat_score) AS max_score, max(s.severity) AS max_severity FROM sessions s WHERE $__timeFilter(s.started_at) GROUP BY s.src_ip ORDER BY max_score DESC, sessions DESC LIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Top source IPs (by max threat score)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "${DS_POSTGRES}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "id": 13,
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT a.dispatched_at AS time, a.channel, a.severity, a.threat_score, a.payload->>'src_ip' AS src_ip FROM alerts a WHERE $__timeFilter(a.dispatched_at) ORDER BY a.dispatched_at DESC LIMIT 25",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent alerts",
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "tags": ["honeystrike", "honeypot", "threat-intel"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "Postgres", "value": "Postgres"},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "DS_POSTGRES",
+        "options": [],
+        "query": "postgres",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "HoneyStrike — Overview",
+  "uid": "honeystrike-overview",
+  "version": 1,
+  "weekStart": ""
+}

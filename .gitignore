@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Poetry
+poetry.lock.bak
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Data / runtime
+/data/
+/maxmind/
+/reports/
+/backups/
+/archive/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+
+# Generated reports
+demo/*.pdf
+demo/*.html
+
+# Secrets
+*.pem
+*.key
+!tests/**/*.pem
+!tests/**/*.key

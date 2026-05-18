@@ -1,0 +1,43 @@
+# =============================================================================
+# HoneyStrike — Caddy reverse proxy (Phase 4 dashboard + API)
+#
+# Substitutions made at deploy time:
+#   {$DOMAIN}   — value of $DOMAIN in .env.production
+#
+# Caddy auto-provisions a Let's Encrypt cert for {$DOMAIN} on first start.
+# Bring up with: `docker compose --profile dashboard up -d`
+# =============================================================================
+
+{$DOMAIN} {
+    encode gzip
+
+    header {
+        # Security baseline. See OWASP secure-headers guidance.
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options    "nosniff"
+        X-Frame-Options           "DENY"
+        Referrer-Policy           "no-referrer"
+        # CSP: the dashboard pulls Leaflet + Chart.js + CartoDB tiles from CDNs.
+        # Tighten further once a build pipeline self-hosts those assets.
+        Content-Security-Policy   "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://*.basemaps.cartocdn.com; connect-src 'self' wss:; frame-ancestors 'none'"
+        Permissions-Policy        "geolocation=(), microphone=(), camera=()"
+
+        # Hide the upstream server identity.
+        -Server
+    }
+
+    # Proxy everything to the dashboard-api container. Long-running WebSocket
+    # upgrades on /api/ws/* are detected automatically by Caddy.
+    reverse_proxy dashboard-api:8000 {
+        flush_interval -1
+        # Forward the real client IP to the API for its access logs.
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    log {
+        output stdout
+        format json
+    }
+}

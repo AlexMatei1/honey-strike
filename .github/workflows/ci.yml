@@ -1,0 +1,281 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Lint + Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.4.1
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: ruff
+        run: poetry run ruff check src tests
+
+      - name: black --check
+        run: poetry run black --check src tests
+
+      - name: mypy --strict
+        run: poetry run mypy --strict src/honeystrike
+
+      - name: bandit
+        run: poetry run bandit -r src/honeystrike -ll
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: honeystrike
+          POSTGRES_PASSWORD: honeystrike
+          POSTGRES_DB: honeystrike
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U honeystrike"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.4.1
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:honeystrike@localhost:5432/honeystrike
+        run: poetry run alembic upgrade head
+
+      - name: pytest unit suite with coverage (gate 80%)
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:honeystrike@localhost:5432/honeystrike
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          poetry run pytest tests/unit \
+            --cov=honeystrike \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  migrations:
+    name: Alembic migration roundtrip
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: honeystrike
+          POSTGRES_PASSWORD: honeystrike
+          POSTGRES_DB: honeystrike
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U honeystrike"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry==2.4.1
+      - run: poetry install --no-interaction --no-root
+
+      # Round-trip every revision against a clean DB: head → base → head.
+      # Any migration that fails the downgrade path or the second upgrade
+      # would have broken in a production rollback drill — catch it here.
+      - name: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:honeystrike@localhost:5432/honeystrike
+        run: poetry run alembic upgrade head
+
+      - name: alembic downgrade base
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:honeystrike@localhost:5432/honeystrike
+        run: poetry run alembic downgrade base
+
+      - name: alembic upgrade head (idempotency check)
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:honeystrike@localhost:5432/honeystrike
+        run: poetry run alembic upgrade head
+
+  integration:
+    name: Integration tests (live stack)
+    runs-on: ubuntu-latest
+    # The integration job builds the production-like dev image and exercises
+    # every honeypot through its published host port — same code paths an
+    # attacker hits in prod.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.4.1
+
+      - name: Install runner-side Python deps (for test driver)
+        run: poetry install --no-interaction
+
+      - name: Create .env for compose
+        run: |
+          cp .env.example .env
+          # Match the dev defaults already documented in .env.example
+          echo "HONEYPOT_HTTP_HOST_PORT=18080" >> .env
+
+      - name: Build dev image
+        run: docker compose -f docker-compose.dev.yml build app
+
+      - name: Start full compose stack
+        run: |
+          docker compose -f docker-compose.dev.yml up -d postgres redis
+          # Wait for DB + Redis health before running migrations.
+          for i in {1..30}; do
+            if docker compose -f docker-compose.dev.yml ps postgres redis \
+                 --format '{{.Health}}' | grep -qv "healthy"; then
+              sleep 2
+            else
+              break
+            fi
+          done
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:change-me-honeystrike@localhost:5432/honeystrike
+        run: poetry run alembic upgrade head
+
+      - name: Bring up honeypot listeners + intel/dashboard services
+        run: |
+          docker compose -f docker-compose.dev.yml up -d \
+            ssh-honeypot http-honeypot ftp-honeypot rdp-honeypot \
+            fingerprint-worker alerting-worker report-worker dashboard-api
+
+      - name: Bootstrap dashboard admin
+        run: docker compose -f docker-compose.dev.yml run --rm app python -m honeystrike.api.bootstrap
+
+      - name: Wait for honeypot + API ports to listen
+        run: |
+          for port in 2222 18080 2221 33389 8001; do
+            for i in {1..30}; do
+              if nc -z 127.0.0.1 $port; then
+                echo "port $port ready"
+                break
+              fi
+              sleep 1
+            done
+          done
+
+      - name: Run integration suite
+        env:
+          DATABASE_URL: postgresql+asyncpg://honeystrike:change-me-honeystrike@localhost:5432/honeystrike
+          REDIS_URL: redis://localhost:6379/0
+          HONEYSTRIKE_HOST: 127.0.0.1
+          HONEYPOT_SSH_PORT: "2222"
+          HONEYPOT_HTTP_PORT: "18080"
+          HONEYPOT_FTP_PORT: "2221"
+          HONEYPOT_RDP_PORT: "33389"
+          DASHBOARD_API_PORT: "8001"
+        run: poetry run pytest tests/integration -v
+
+      - name: Dump honeypot logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.dev.yml ps
+          docker compose -f docker-compose.dev.yml logs --tail=200
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker-compose.dev.yml down -v
+
+  dep-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pipx install poetry==2.4.1
+      # `poetry export` is a plugin in Poetry 2.x.
+      - run: pipx inject poetry poetry-plugin-export
+      - run: poetry export --without-hashes -f requirements.txt -o requirements.txt
+      - run: pipx install pip-audit && pip-audit -r requirements.txt
+
+  container-scan:
+    name: Container image scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t honeystrike:ci .
+
+      - name: Run Trivy filesystem scan (configuration)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          # Don't fail the build over secrets/misconfig findings; surface them
+          # for the operator to triage. CVE findings still fail (exit-code:1).
+          skip-files: ".env.example,.env.production.example"
+          format: table
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: honeystrike:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

@@ -1,0 +1,21 @@
+{
+  "service": "http",
+  "src_ip": "198.51.100.7",
+  "started_at": "2026-05-18T13:00:00Z",
+  "sibling_sessions": [],
+  "events": [
+    {
+      "event_type": "HTTP_REQUEST",
+      "ts": "2026-05-18T13:00:00Z",
+      "payload": {
+        "method": "GET",
+        "path": "/wp-admin/index.php",
+        "query": "id=1+UNION+SELECT+password+FROM+users",
+        "user_agent": "sqlmap/1.7.8#stable",
+        "sqli_pattern": true,
+        "cve_signature": null,
+        "scanner_detected": "sqlmap"
+      }
+    }
+  ]
+}

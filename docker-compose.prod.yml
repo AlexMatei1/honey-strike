@@ -1,0 +1,362 @@
+# =============================================================================
+# HoneyStrike — production compose stack
+#
+# Profiles split the topology into deployable subsets:
+#
+#   --profile capture   →  postgres + redis + 4 honeypots
+#                          (partial-stack: collects raw events; no enrichment
+#                           or alerting yet — that's Phase 3+)
+#
+#   --profile intel     →  + intel-worker, alerting-worker
+#                          (Phase 3)
+#
+#   --profile dashboard →  + dashboard-api, report-worker, caddy
+#                          (Phase 4)
+#
+# Example for partial-stack deploy:
+#   cp .env.production.example .env.production
+#   $EDITOR .env.production
+#   docker compose -f docker-compose.prod.yml --env-file .env.production \
+#     --profile capture build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production \
+#     --profile capture up -d
+#
+# Security hardening applied to every honeypot container:
+#   - non-root user (UID 1000, baked into the image)
+#   - read-only rootfs with explicit tmpfs/volume writable mounts
+#   - cap_drop:ALL, cap_add:NET_BIND_SERVICE (needed for ports 21/22/80)
+#   - no-new-privileges
+#
+# Bind addresses:
+#   - postgres + redis: internal-net only, NEVER published
+#   - honeypot services: 0.0.0.0 on the real wire ports (21/22/80/443/3389)
+#   - real SSH management port (2222 or similar) is handled by the host's
+#     sshd — NOT by this compose file
+# =============================================================================
+
+x-honeypot-base: &honeypot-base
+  image: honeystrike:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file: .env.production
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # ===========================================================================
+  # Data plane — postgres + redis. NEVER exposed to the public network.
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: honeystrike-db
+    restart: unless-stopped
+    profiles: ["capture", "intel", "dashboard", "migrate"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - backup_data:/backups
+    # Critical: NO `ports:` block here. Postgres is reachable only on
+    # internal-net. Compromise of a honeypot must not give DB access.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - internal-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    container_name: honeystrike-cache
+    restart: unless-stopped
+    profiles: ["capture", "intel", "dashboard", "migrate"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --save
+      - "900 1"
+      - --save
+      - "300 10"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    networks:
+      - internal-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ===========================================================================
+  # One-shot migrator. Runs `alembic upgrade head` and exits.
+  # Use:  docker compose -f docker-compose.prod.yml run --rm migrate
+  # ===========================================================================
+  migrate:
+    image: honeystrike:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env.production
+    profiles: ["migrate"]
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal-net
+
+  # ===========================================================================
+  # Honeypot services — public-facing, on both honeypot-net + internal-net
+  # so they can publish to Redis but cannot reach postgres directly. The
+  # session manager writes to postgres via SQLAlchemy on internal-net.
+  # ===========================================================================
+  ssh-honeypot:
+    <<: *honeypot-base
+    container_name: honeystrike-ssh
+    profiles: ["capture", "intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.services.ssh"]
+    volumes:
+      - ssh_host_keys:/var/lib/honeystrike/ssh
+    ports:
+      - "22:22"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  http-honeypot:
+    <<: *honeypot-base
+    container_name: honeystrike-http
+    profiles: ["capture", "intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.services.http"]
+    environment:
+      HTTP_LISTEN_PORT: "80"
+    ports:
+      - "80:80"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  ftp-honeypot:
+    <<: *honeypot-base
+    container_name: honeystrike-ftp
+    profiles: ["capture", "intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.services.ftp"]
+    environment:
+      FTP_LISTEN_PORT: "21"
+      FTP_PASSIVE_PORT_FROM: "30000"
+      FTP_PASSIVE_PORT_TO: "30009"
+    # Passive data ports are intentionally NOT exposed. LIST/RETR/STOR commands
+    # are captured before the data channel times out — that's the data we want.
+    ports:
+      - "21:21"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  rdp-honeypot:
+    <<: *honeypot-base
+    container_name: honeystrike-rdp
+    profiles: ["capture", "intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.services.rdp"]
+    environment:
+      RDP_LISTEN_PORT: "3389"
+    ports:
+      - "3389:3389"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # TLS-fingerprint honeypot (Phase 5 stretch). Note: Caddy in `dashboard`
+  # profile binds 443 for the actual TLS terminator, so the JA3 sniffer
+  # listens on the operator-chosen high port (default 8443).
+  # ---------------------------------------------------------------------------
+  tls-honeypot:
+    <<: *honeypot-base
+    container_name: honeystrike-tls
+    profiles: ["capture", "intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.services.tls_sniffer"]
+    environment:
+      TLS_LISTEN_PORT: "443"
+    ports:
+      - "${HONEYPOT_TLS_HOST_PORT:-8443}:443"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ===========================================================================
+  # Phase 3 — intel workers
+  # ===========================================================================
+  fingerprint-worker:
+    <<: *honeypot-base
+    container_name: honeystrike-fingerprint
+    profiles: ["intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.workers.intel.fingerprint"]
+    environment:
+      WORKER_CONSUMER_NAME: ${FINGERPRINT_CONSUMER_NAME:-fp-prod}
+      MAXMIND_DB_DIR: /maxmind
+    # The worker needs read access to the MaxMind databases the operator
+    # refreshes via infra/update_maxmind.sh. AbuseIPDB credentials are loaded
+    # from .env.production by the env_file inherited from the base anchor.
+    volumes:
+      - maxmind_db:/maxmind:ro
+    # Only internal-net — the worker never accepts inbound traffic and only
+    # makes outbound calls to MaxMind/AbuseIPDB via the egress NAT.
+    networks:
+      - internal-net
+    depends_on:
+      - postgres
+      - redis
+    # Drop NET_BIND_SERVICE — the worker never binds a port. Keep the rest
+    # of the hardening from the base anchor.
+    cap_add: []
+
+  alerting-worker:
+    <<: *honeypot-base
+    container_name: honeystrike-alerting
+    profiles: ["intel", "dashboard"]
+    command: ["python", "-m", "honeystrike.workers.alerting.worker"]
+    environment:
+      WORKER_CONSUMER_NAME: ${ALERTING_CONSUMER_NAME:-alert-prod}
+    networks:
+      - internal-net
+    depends_on:
+      - postgres
+      - redis
+    # The alerting worker reaches outbound to Telegram/Slack/SMTP. It never
+    # binds a port, so drop NET_BIND_SERVICE.
+    cap_add: []
+
+  # ===========================================================================
+  # Report worker (Phase 4 Week 14) — renders per-session PDF/HTML reports.
+  # ===========================================================================
+  report-worker:
+    <<: *honeypot-base
+    container_name: honeystrike-reports
+    profiles: ["dashboard"]
+    command: ["python", "-m", "honeystrike.workers.reports.worker"]
+    environment:
+      WORKER_CONSUMER_NAME: ${REPORT_CONSUMER_NAME:-report-prod}
+    volumes:
+      - report_files:/reports
+    networks:
+      - internal-net
+    depends_on:
+      - postgres
+      - redis
+    cap_add: []
+
+  # ===========================================================================
+  # Phase 4 — dashboard API (Week 11).
+  # ===========================================================================
+  dashboard-api:
+    <<: *honeypot-base
+    container_name: honeystrike-api
+    profiles: ["dashboard"]
+    command: ["python", "-m", "honeystrike.api"]
+    environment:
+      API_LISTEN_HOST: "0.0.0.0"
+      API_LISTEN_PORT: "8000"
+    # The API is never exposed on the host wire — only Caddy on the same
+    # internal-net reaches it. TLS termination + CSP/HSTS happen in Caddy.
+    expose:
+      - "8000"
+    # Read-only — the API only streams generated reports back to clients;
+    # the report-worker is the only producer.
+    volumes:
+      - report_files:/reports:ro
+    networks:
+      - internal-net
+    depends_on:
+      - postgres
+      - redis
+    cap_add: []
+
+  # ===========================================================================
+  # Caddy reverse proxy + automatic Let's Encrypt TLS.
+  # Public on 80/443; forwards to dashboard-api:8000 over internal-net.
+  # ===========================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: honeystrike-caddy
+    profiles: ["dashboard"]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN must be set in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal-net
+    depends_on:
+      - dashboard-api
+
+volumes:
+  postgres_data:
+  redis_data:
+  ssh_host_keys:
+  backup_data:
+  maxmind_db:
+  report_files:
+  caddy_data:
+  caddy_config:
+
+networks:
+  # honeypot-net: hosts the public-facing services. No outbound restrictions
+  # on this network — services here MUST never initiate connections to
+  # attackers (see docs/07 §2). The codebase enforces this at the call sites.
+  honeypot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+  # internal-net: postgres, redis, and (later) workers. Honeypot services are
+  # also on this network so they can publish events. Postgres / Redis are
+  # NOT on honeypot-net, so a compromised honeypot process can hit the
+  # event bus + DB but cannot serve them publicly.
+  internal-net:
+    driver: bridge
+    internal: false   # workers in Phase 3 need outbound to AbuseIPDB/MaxMind
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24

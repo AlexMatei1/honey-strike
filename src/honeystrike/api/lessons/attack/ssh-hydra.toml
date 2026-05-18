@@ -1,0 +1,118 @@
+id = "ssh-hydra"
+family = "attack"
+title = "SSH brute force (Hydra style)"
+blurb = "Hammer an SSH server with a wordlist until something logs in."
+ttps = ["T1110.001", "T1078", "T1592"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1110.001 — *Brute Force: Password Guessing*
+
+Hydra is the canonical brute-force tool for network logins. It opens a TCP
+transport, walks a wordlist, and submits one password after another against
+a fixed username. From the defender's point of view, you'll see this as a
+burst of `SSH_AUTH_ATTEMPT` events with the same `src_ip` and the same
+`username`, denied for most rows and (in a vulnerable lab) eventually
+granted.
+
+We use paramiko here instead of the `hydra` CLI because it lets us:
+- reuse a single SSH transport across many attempts (faster, less noisy on
+  the network — but every attempt still writes one event, so it lights up
+  the dashboard the same way),
+- inspect each rejection programmatically and stop the moment we get in,
+- chain a post-auth shell (`whoami`, `cat /etc/passwd`) to trigger the
+  T1078 + T1592 detections after access.
+
+You'll type the inner `_run()` function below, line by line. The mascot
+will tell you when you've drifted — but the cursor will refuse the wrong
+key, so you can't actually break it.
+"""
+
+[live]
+scenario = "ssh-hydra"
+default_target = "ssh-honeypot:22"
+
+[[blocks]]
+kind = "prose"
+text = "We're inside the worker function. Set up the per-attempt counter and the granted-password placeholder."
+
+[[blocks]]
+kind = "code"
+target = "attempts = 0"
+annotation = "How many auth attempts we make. Used in the return summary."
+
+[[blocks]]
+kind = "code"
+target = "granted = None"
+annotation = "Holds the password that worked, or stays None if we get nothing."
+
+[[blocks]]
+kind = "code"
+target = "delay = _sleep(intensity)"
+annotation = "Translates intensity (slow/medium/burst) into seconds between attempts. burst=0."
+
+[[blocks]]
+kind = "prose"
+text = "Open the TCP socket to the SSH service. We give it 10 seconds — honeypots are usually next door."
+
+[[blocks]]
+kind = "code"
+target = "sock = socket.create_connection((host, port), timeout=10)"
+annotation = "Plain TCP. No TLS — SSH does its own framing on top of raw bytes."
+
+[[blocks]]
+kind = "code"
+target = "t = paramiko.Transport(sock)"
+annotation = "Wrap the socket in a paramiko Transport. This object will drive the SSH protocol state machine."
+
+[[blocks]]
+kind = "code"
+target = "t.start_client(timeout=10)"
+annotation = "Send our SSH banner, receive the server's, complete the KEX handshake. After this we can attempt auth."
+
+[[blocks]]
+kind = "prose"
+text = "Now the loop. For each password, count an attempt and try password auth. paramiko raises AuthenticationException on rejection — that's our signal to keep going."
+
+[[blocks]]
+kind = "code"
+target = "for pw in passwords:"
+annotation = "Wordlist iteration. `passwords` was set up earlier from either --password-list or the Hydra fast-creds."
+
+[[blocks]]
+kind = "code"
+target = "    attempts += 1"
+annotation = "Indent four spaces. We bump even on failure, so the defender sees N attempts."
+
+[[blocks]]
+kind = "code"
+target = "    try:"
+annotation = "Each attempt has to be guarded — a wrong password raises, not returns."
+
+[[blocks]]
+kind = "code"
+target = "        t.auth_password(username, pw)"
+annotation = "The actual brute. Server logs an SSH_AUTH_ATTEMPT event before deciding the outcome."
+
+[[blocks]]
+kind = "code"
+target = "        granted = pw"
+annotation = "Reached only if auth_password didn't raise — the credential worked."
+
+[[blocks]]
+kind = "code"
+target = "        break"
+annotation = "Stop walking the wordlist the moment we're in. (Don't keep trying after success.)"
+
+[[blocks]]
+kind = "choice"
+prompt = "From the defender's perspective, what's the most damning evidence of brute force in the captured events?"
+options = [
+  "The number of attempts alone",
+  "Same src_ip + same username + many denied attempts in a short window",
+  "The exact contents of each guessed password",
+  "The cipher suite chosen by paramiko",
+]
+correct = 1
+explanation = "The T1110.001 rule fires on >5 auth attempts in one session; the username+src_ip pair is what makes it 'guessing' rather than 'normal traffic'."

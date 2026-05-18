@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Attack — HoneyStrike Play{% endblock %}
+{% block content %}
+  <section class="play-page">
+    <header class="page-header">
+      <h1>🗡️ Learn to attack</h1>
+      <a class="muted" href="/play">&larr; back to Play</a>
+    </header>
+
+    <div class="lesson-grid hub">
+      <div>
+        <p class="muted">Pick a lesson. Each one walks you through writing the attack
+           by typing real code or shell commands, with annotations explaining every line.
+           After you finish the typing, you can replay a fixture or fire the attack live
+           at your honeypot.</p>
+        <div id="hub-list" class="lesson-card-grid">
+          <p class="muted">Loading lessons…</p>
+        </div>
+      </div>
+      {% include "_mascot.html" %}
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/play_attack_hub.js"></script>
+{% endblock %}

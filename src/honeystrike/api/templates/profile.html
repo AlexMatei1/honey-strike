@@ -1,0 +1,63 @@
+{% extends "_base.html" %}
+{% block title %}Profile — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="profile-page">
+    <header class="profile-head">
+      <div class="profile-avatar" id="profile-avatar">🐝</div>
+      <div class="profile-id">
+        <h1 id="profile-username">…</h1>
+        <p class="muted">
+          <span id="profile-role">operator</span> ·
+          member for <span id="profile-member-for">…</span> ·
+          last seen <span id="profile-last-login">…</span>
+        </p>
+        <div class="profile-xp-bar">
+          <div class="rank-line">
+            <span class="rank-name" id="profile-rank">Apprentice</span>
+            <span class="rank-xp"><span id="profile-xp">0</span> XP
+              <span class="muted" id="profile-next-rank"></span></span>
+          </div>
+          <div class="rank-bar"><div class="rank-bar-fill" id="profile-rank-fill"></div></div>
+        </div>
+      </div>
+    </header>
+
+    <section class="profile-stats">
+      <div class="stat-tile"><span class="label">Sessions captured</span><span class="value" data-key="total_sessions">—</span></div>
+      <div class="stat-tile"><span class="label">Critical</span><span class="value alarm" data-key="critical_sessions">—</span></div>
+      <div class="stat-tile"><span class="label">Unique IPs</span><span class="value" data-key="unique_ips">—</span></div>
+      <div class="stat-tile"><span class="label">Countries</span><span class="value" data-key="unique_countries">—</span></div>
+      <div class="stat-tile"><span class="label">Max threat score</span><span class="value" data-key="max_threat_score">—</span></div>
+      <div class="stat-tile"><span class="label">🔥 Streak</span><span class="value" id="profile-streak">0</span></div>
+    </section>
+
+    <section class="profile-section">
+      <h2>🏅 Badges</h2>
+      <p class="muted">Unlocked by playing the game — completing lessons, blocking attackers,
+         catching canaries.</p>
+      <div class="badge-grid" id="badge-grid"></div>
+    </section>
+
+    <section class="profile-section">
+      <h2>🎓 Lesson progress</h2>
+      <div class="lesson-progress-grid">
+        <div class="prog-pane">
+          <h3>🗡 Attack lessons</h3>
+          <ul id="prog-attack"><li class="muted">…</li></ul>
+        </div>
+        <div class="prog-pane">
+          <h3>🛡 Defender lessons</h3>
+          <ul id="prog-defend"><li class="muted">…</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <h2>📜 Recent activity</h2>
+      <ol id="activity-log"><li class="muted">No activity yet — start a lesson!</li></ol>
+    </section>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/profile.js"></script>
+{% endblock %}
