@@ -25,6 +25,9 @@ class Service(StrEnum):
     FTP = "ftp"
     RDP = "rdp"
     TLS = "tls"
+    TELNET = "telnet"
+    SMTP = "smtp"
+    REDIS = "redis"
 
 
 class EventType(StrEnum):
@@ -37,6 +40,9 @@ class EventType(StrEnum):
     FTP_COMMAND = "FTP_COMMAND"
     RDP_CONNECT = "RDP_CONNECT"
     TLS_CLIENT_HELLO = "TLS_CLIENT_HELLO"
+    TELNET_AUTH_ATTEMPT = "TELNET_AUTH_ATTEMPT"
+    SMTP_COMMAND = "SMTP_COMMAND"
+    REDIS_COMMAND = "REDIS_COMMAND"
     TTP_MATCHED = "TTP_MATCHED"
     ALERT_DISPATCHED = "ALERT_DISPATCHED"
 

@@ -4,7 +4,7 @@
 
 ### *A multi-protocol honeypot platform with a learning game on top.*
 
-Capture real attackers across **SSH / HTTP / FTP / RDP / TLS**, enrich every session with **geo-IP + abuse reputation + tool fingerprint + MITRE ATT&CK attribution + threat score**, send alerts, render PDF reports, and let your operators **learn to attack and defend by typing real code** — all in one `docker compose up -d`.
+Capture real attackers across **SSH / HTTP / FTP / RDP / TLS / Telnet / SMTP / Redis**, enrich every session with **geo-IP + abuse reputation + tool fingerprint + MITRE ATT&CK attribution + threat score**, send alerts, render PDF reports, and let your operators **learn to attack and defend by typing real code** — all in one `docker compose up -d`.
 
 [![CI](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-v1.0%20shipped-success?style=flat-square)
@@ -66,7 +66,7 @@ The result is one repo that works as a production honeypot, a SOC training platf
 <td width="50%" valign="top">
 
 ### 🎣 Capture layer
-- **5 honeypot listeners** (SSH, HTTP, FTP, RDP, TLS-sniffer)
+- **8 honeypot listeners** (SSH, HTTP, FTP, RDP, TLS-sniffer, Telnet, SMTP, Redis)
 - Convincing canned responses + **3 CTF-style canary tokens** (fake AWS key, fake /etc/passwd entry, fake admin token)
 - Per-IP rate limiting; granted-after-N policy on SSH
 
@@ -322,6 +322,9 @@ Honeypot ports (host → container):
 | FTP | `2221` | `:21` | `ftp 127.0.0.1 2221` |
 | RDP | `33389` | `:3389` | `nmap -sV -p 33389 127.0.0.1` |
 | TLS sniffer | `8443` | `:443` | `openssl s_client -connect 127.0.0.1:8443 -servername example.com` |
+| Telnet | `2323` | `:23` | `telnet 127.0.0.1 2323` (login loop, always fails) |
+| SMTP | `2525` | `:25` | `nc 127.0.0.1 2525` then `EHLO x` / `RCPT TO:<a@gmail.com>` (relay refused) |
+| Redis | `16379` | `:6379` | `redis-cli -p 16379 INFO` (fake unauth Redis; `CONFIG SET dir` flagged) |
 | Dashboard API | `8001` | `:8000` | http://localhost:8001 |
 | Lobby API | `8002` | `:8002` | http://localhost:8002/lobby/players |
 
@@ -375,12 +378,15 @@ honey-strike/
 │   ├── core/                         ▸ models · db · events · logging · blocklist
 │   │                                   session_manager · config
 │   ├── lobby/                        ▸ FastAPI service for multiplayer matchmaking
-│   ├── services/                     ▸ the 5 honeypot listeners
+│   ├── services/                     ▸ the 8 honeypot listeners
 │   │   ├── ssh/      server.py · shell.py · attempt_counter.py · host_key.py
 │   │   ├── http/     server.py · detectors.py · ja3.py · templates.py
 │   │   ├── ftp/      handler.py · __main__.py
 │   │   ├── rdp/      pdu.py · __main__.py
-│   │   └── tls_sniffer/ __main__.py
+│   │   ├── tls_sniffer/    __main__.py
+│   │   ├── telnet/         protocol.py · __main__.py
+│   │   ├── smtp/           protocol.py · __main__.py
+│   │   └── redis_honeypot/ protocol.py · __main__.py
 │   └── workers/
 │       ├── intel/    geo · abuseipdb · signatures · fingerprint · aggregator
 │       │             ttp_rules · threat_scoring · ml_anomaly

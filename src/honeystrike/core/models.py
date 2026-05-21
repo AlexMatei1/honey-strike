@@ -40,7 +40,8 @@ class Session(Base):
     __tablename__ = "sessions"
     __table_args__ = (
         CheckConstraint(
-            "service IN ('ssh','http','ftp','rdp','tls')", name="ck_service"
+            "service IN ('ssh','http','ftp','rdp','tls','telnet','smtp','redis')",
+            name="ck_service",
         ),
         CheckConstraint(
             "state IN ('OPEN','CLOSED','TIMEOUT')", name="ck_state"

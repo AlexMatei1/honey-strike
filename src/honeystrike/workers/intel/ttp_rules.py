@@ -179,6 +179,10 @@ def _password_guessing_rule(ctx: SessionContext) -> TTPMatch | None:
             p for p in ctx.payloads(EventType.FTP_COMMAND)
             if p.get("command", "").upper() == "PASS"
         ]
+    elif ctx.service == "telnet":
+        # Telnet brute force (Mirai et al.) is one auth attempt per
+        # username/password pair — same threshold logic as SSH.
+        auth_events = ctx.payloads(EventType.TELNET_AUTH_ATTEMPT)
     if len(auth_events) <= 5:
         return None
     return TTPMatch(

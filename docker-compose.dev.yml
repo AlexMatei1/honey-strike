@@ -291,6 +291,67 @@ services:
       - honeypot-net
       - internal-net
 
+  # ---------------------------------------------------------------------------
+  # Telnet honeypot (asyncio) — host 2323 → container 23.
+  # Realistic login:/Password: loop; records every credential pair.
+  # ---------------------------------------------------------------------------
+  telnet-honeypot:
+    <<: *app-base
+    container_name: honeystrike-telnet
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.telnet"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      TELNET_LISTEN_PORT: "23"
+    ports:
+      - "${HONEYPOT_TELNET_HOST_PORT:-2323}:23"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # SMTP honeypot (asyncio) — host 2525 → container 25.
+  # ESMTP banter; flags open-relay (external RCPT TO) probes.
+  # ---------------------------------------------------------------------------
+  smtp-honeypot:
+    <<: *app-base
+    container_name: honeystrike-smtp
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.smtp"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      SMTP_LISTEN_PORT: "25"
+    ports:
+      - "${HONEYPOT_SMTP_HOST_PORT:-2525}:25"
+    networks:
+      - honeypot-net
+      - internal-net
+
+  # ---------------------------------------------------------------------------
+  # Redis honeypot (asyncio RESP) — host 16379 → container 6379.
+  # Fakes an unauth Redis; flags the CONFIG SET dir/dbfilename RCE pattern.
+  # NOTE: distinct from the real `redis` service the platform uses internally.
+  # ---------------------------------------------------------------------------
+  redis-honeypot:
+    <<: *app-base
+    container_name: honeystrike-redis-hp
+    restart: unless-stopped
+    command: ["python", "-m", "honeystrike.services.redis_honeypot"]
+    environment:
+      PYTHONPATH: /app/src
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-honeystrike}:${POSTGRES_PASSWORD:-change-me-honeystrike}@postgres:5432/${POSTGRES_DB:-honeystrike}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_HP_LISTEN_PORT: "6379"
+    ports:
+      - "${HONEYPOT_REDIS_HP_HOST_PORT:-16379}:6379"
+    networks:
+      - honeypot-net
+      - internal-net
+
 volumes:
   postgres_data:
   redis_data:
