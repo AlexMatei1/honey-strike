@@ -25,7 +25,7 @@ asyncpg = "^0.30.0"
 greenlet = "^3.1.1"
 
 # Event bus
-redis = { extras = ["hiredis"], version = "^5.2.0" }
+redis = { extras = ["hiredis"], version = ">=5.2,<8.0" }
 
 # Auth
 pyjwt = { extras = ["crypto"], version = "^2.10.0" }
