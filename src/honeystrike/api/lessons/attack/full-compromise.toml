@@ -1,0 +1,79 @@
+id = "full-compromise"
+family = "attack"
+title = "Full compromise chain"
+blurb = "Recon → web exploit → SSH brute → shell discovery → exfil, end to end."
+ttps = ["T1190", "T1110.001", "T1078", "T1083", "T1592"]
+difficulty = "hard"
+typing_model = "mixed"
+
+briefing = """
+**MITRE ATT&CK:** the whole kill chain — T1595/T1592 (recon) → T1190
+(exploit) → T1110.001 (brute) → T1078 (valid accounts) → T1083 (discovery).
+
+This is the capstone. A real intrusion isn't one technique; it's a
+sequence: find the target, find a way in, get credentials, use them, look
+around, take something. `full-compromise` chains the single-protocol
+runners you've already learned, with a short dwell between phases so the
+defender's dashboard shows the story unfold in order.
+
+This lesson is **conceptual** — you'll answer checkpoints about the chain
+rather than retype every runner (you've typed them in the other lessons).
+Then **fire it live** and watch 6–10 sessions land on your dashboard,
+peaking at a critical score.
+"""
+
+[live]
+scenario = "full-compromise"
+default_target = "ssh-honeypot"
+
+[[blocks]]
+kind = "prose"
+text = "Phase 1 — Recon. The chain starts with http-recon: spray common paths (/.env, /admin, /.git) to map the target and grab any leaked secrets (canaries). MITRE T1592 + T1595."
+
+[[blocks]]
+kind = "choice"
+prompt = "Recon comes first. Why not just brute-force SSH immediately?"
+options = [
+  "Brute force is illegal without recon",
+  "Recon reveals which services exist, which creds leaked, and what's worth attacking — it makes everything after it cheaper",
+  "SSH is always closed",
+  "Order doesn't matter",
+]
+correct = 1
+explanation = "Recon is the cheapest phase and it informs every later one. Leaked creds from /.env might skip the brute-force entirely."
+
+[[blocks]]
+kind = "prose"
+text = "Phase 2 — Web exploit. Next the chain fires http-sqlmap: a UNION-SELECT with the sqlmap UA. The honeypot flags sqli_pattern → T1190 (Exploit Public-Facing Application)."
+
+[[blocks]]
+kind = "prose"
+text = "Phase 3 — Access. Then ssh-hydra with --keep-shell: brute the login, and on success run post-auth commands. The granted login + a follow-up command is what fires T1078 (Valid Accounts)."
+
+[[blocks]]
+kind = "choice"
+prompt = "ssh-hydra alone fires T1110.001. What makes the chain ALSO fire T1078 (Valid Accounts)?"
+options = [
+  "Trying more passwords",
+  "A granted login FOLLOWED BY a post-auth command — proof the credential was actually used",
+  "Using root as the username",
+  "Connecting twice",
+]
+correct = 1
+explanation = "T1078 isn't 'got in' — it's 'got in AND used it'. The _valid_accounts_rule needs a granted auth plus at least one SSH_COMMAND."
+
+[[blocks]]
+kind = "prose"
+text = "Phase 4 — Discovery + exfil. Post-auth, the shell runs `cat /etc/passwd` (T1083) and reads the fake AWS key (canary capture). The dashboard now shows one src_ip with a 6–10 session chain peaking critical. Fire it live and watch."
+
+[[blocks]]
+kind = "choice"
+prompt = "On the dashboard, how would a defender recognise this as ONE actor, not six unrelated attacks?"
+options = [
+  "They wouldn't",
+  "All sessions share the same src_ip in a tight time window, across escalating techniques",
+  "The threat scores are identical",
+  "They all hit the same port",
+]
+correct = 1
+explanation = "Shared src_ip + tight timing + an escalating technique sequence (recon→exploit→access→discovery) is the signature of a single campaign. That's exactly what the replay theater and War Room visualise."

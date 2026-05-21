@@ -1,0 +1,80 @@
+id = "detect-victim-recon"
+family = "defend"
+title = "Detect victim host-info gathering (T1592)"
+blurb = "Spot /.env probes and post-shell uname/whoami/id commands."
+ttps = ["T1592"]
+difficulty = "easy"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1592 — *Gather Victim Host Information*
+
+Attackers profile the host: which OS, which user, what's configured. Over
+HTTP that's hitting info-disclosure paths (`/.env`, `/.git`,
+`/server-status`, `/wp-config`, `/.aws/`). Over SSH it's `uname`, `whoami`,
+`id`, `hostname`, or `cat /etc/os-release`.
+
+Type the SSH branch using the `_HOST_INFO_CMD` regex. The fixture is an SSH
+session running `whoami`, so it fires.
+"""
+
+reference_source_excerpt = """
+_HOST_INFO_CMD = re.compile(
+    r"\\b(?:uname|whoami|id|hostname|lsb_release|uptime|w\\b|who\\b|env\\b|printenv|"
+    r"cat\\s+/etc/(?:passwd|os-release|hostname|issue))", re.I)
+
+def _victim_host_info_rule(ctx):
+    elif ctx.service == "ssh":
+        for ev in ctx.events:
+            if ev.get("event_type") != EventType.SSH_COMMAND.value:
+                continue
+            raw = (ev.get("payload") or {}).get("raw") or ""
+            if _HOST_INFO_CMD.search(raw):
+                return TTPMatch(technique_id="T1592", ...)
+    return None
+"""
+
+[fixture]
+events_json = "ssh-host-info"
+expected = true
+
+[[blocks]]
+kind = "prose"
+text = "Same shape as the file-discovery rule, different regex. Walk SSH_COMMAND events and test the raw command against the host-info pattern."
+
+[[blocks]]
+kind = "code"
+target = "for ev in ctx.events:"
+annotation = "Each event in the session."
+
+[[blocks]]
+kind = "code"
+target = "    if ev.get(\"event_type\") != EventType.SSH_COMMAND.value:"
+annotation = "We only inspect commands here."
+
+[[blocks]]
+kind = "code"
+target = "        continue"
+annotation = "Skip non-command events."
+
+[[blocks]]
+kind = "code"
+target = "    raw = (ev.get(\"payload\") or {}).get(\"raw\") or \"\""
+annotation = "The command text."
+
+[[blocks]]
+kind = "code"
+target = "    if _HOST_INFO_CMD.search(raw):"
+annotation = "Matches uname/whoami/id/hostname and `cat /etc/os-release` style host-profiling commands."
+
+[[blocks]]
+kind = "choice"
+prompt = "T1083 (discovery) and T1592 (host info) can both fire on one SSH session. Is that a bug?"
+options = [
+  "Yes — only one should fire",
+  "No — they're different tactics; `ls` is file discovery, `whoami` is host-info gathering, and a real attacker does both",
+  "Yes — they're duplicates",
+  "Only if the scores differ",
+]
+correct = 1
+explanation = "MITRE techniques aren't mutually exclusive. A session that runs both `ls` and `whoami` genuinely exhibits both T1083 and T1592. Multiple attributions per session is expected."

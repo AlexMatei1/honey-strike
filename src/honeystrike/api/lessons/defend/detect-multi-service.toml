@@ -1,0 +1,97 @@
+id = "detect-multi-service"
+family = "defend"
+title = "Detect multi-service scanning (T1595.001)"
+blurb = "Correlate sibling sessions from one IP to spot a port scanner."
+ttps = ["T1595.001"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1595.001 — *Active Scanning: Scanning IP Blocks*
+
+This is the first rule that looks **beyond a single session**. A scanner
+touches many services from one IP in seconds. The rule walks
+`ctx.sibling_sessions` (other sessions sharing the time window) and counts
+the distinct services seen from the same `src_ip` within 60 s. Two or more
+= scanning.
+
+Type the correlation body. The fixture is an SSH session whose sibling
+sessions include HTTP and FTP from the same IP seconds apart — so `seen`
+reaches 3 and the rule fires.
+"""
+
+reference_source_excerpt = """
+def _multi_service_scan_rule(ctx):
+    if not ctx.sibling_sessions:
+        return None
+    seen = {ctx.service}
+    for sess in ctx.sibling_sessions:
+        if sess.get("src_ip") != ctx.src_ip:
+            continue
+        sess_started = sess.get("started_at")
+        if abs((sess_started - ctx.started_at).total_seconds()) <= 60:
+            seen.add(sess.get("service"))
+    if len(seen) < 2:
+        return None
+    return TTPMatch(technique_id="T1595.001", ...)
+"""
+
+[fixture]
+events_json = "multi-service-scan"
+expected = true
+
+[[blocks]]
+kind = "prose"
+text = "Start the seen-set with THIS session's service, then fold in sibling sessions from the same IP inside the time window."
+
+[[blocks]]
+kind = "code"
+target = "if not ctx.sibling_sessions:"
+annotation = "No siblings means nothing to correlate — bail early."
+
+[[blocks]]
+kind = "code"
+target = "    return None"
+annotation = "Single isolated session; can't be a multi-service scan."
+
+[[blocks]]
+kind = "code"
+target = "seen = {ctx.service}"
+annotation = "A set seeded with our own service. We'll add sibling services and check the size."
+
+[[blocks]]
+kind = "code"
+target = "for sess in ctx.sibling_sessions:"
+annotation = "Each candidate sibling session."
+
+[[blocks]]
+kind = "code"
+target = "    if sess.get(\"src_ip\") != ctx.src_ip:"
+annotation = "Only correlate sessions from the SAME source IP — different IPs aren't the same scanner."
+
+[[blocks]]
+kind = "code"
+target = "        continue"
+annotation = "Different IP; skip."
+
+[[blocks]]
+kind = "code"
+target = "    seen.add(sess.get(\"service\"))"
+annotation = "(After the 60s time check.) Add the sibling's service to the set."
+
+[[blocks]]
+kind = "code"
+target = "if len(seen) < 2:"
+annotation = "One service = a normal connection. Two or more from one IP in 60s = scanning."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why the 60-second window instead of correlating ALL of an IP's sessions ever?"
+options = [
+  "Performance only",
+  "Scanning is a burst — a returning visitor over days isn't a scan; the window keeps it to genuine fan-out",
+  "60s is the TCP timeout",
+  "It's arbitrary",
+]
+correct = 1
+explanation = "Without the window, any IP that ever touched two services would trip it. The burst constraint is what makes it 'scanning' rather than 'normal repeat traffic'."

@@ -1,0 +1,14 @@
+{
+  "service": "ssh",
+  "src_ip": "198.51.100.23",
+  "started_at": "2026-05-18T14:00:00Z",
+  "sibling_sessions": [],
+  "events": [
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:00Z", "payload": {"username": "admin",   "password": "admin123",  "success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:00Z", "payload": {"username": "oracle",  "password": "oracle",    "success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:01Z", "payload": {"username": "postgres","password": "postgres",  "success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:01Z", "payload": {"username": "deploy",  "password": "deploy2021","success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:02Z", "payload": {"username": "jenkins", "password": "jenkins",   "success": false}},
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T14:00:02Z", "payload": {"username": "git",     "password": "git123",    "success": false}}
+  ]
+}

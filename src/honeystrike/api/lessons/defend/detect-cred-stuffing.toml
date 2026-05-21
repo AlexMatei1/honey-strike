@@ -1,0 +1,85 @@
+id = "detect-cred-stuffing"
+family = "defend"
+title = "Detect credential stuffing (T1110.004)"
+blurb = "Distinguish breach-dump replay from plain password guessing."
+ttps = ["T1110.004"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1110.004 — *Brute Force: Credential Stuffing*
+
+Stuffing ≠ guessing. Guessing hammers one account with many passwords;
+stuffing replays `user:pass` pairs harvested from breach dumps, so each
+attempt usually has a *different username*. We use that: fire when a
+session has **≥ 5 auth attempts AND ≥ 4 distinct usernames**.
+
+The password-guessing rule (>5 attempts) also fires alongside — the worker
+dedups by id, and both attributions are legitimate.
+
+Type the rule body. The fixture has 6 attempts across 5 usernames, so it
+should fire.
+"""
+
+reference_source_excerpt = """
+def _credential_stuffing_rule(ctx):
+    if ctx.service == "ssh":
+        attempts = ctx.payloads(EventType.SSH_AUTH_ATTEMPT)
+        usernames = [p.get("username") for p in attempts if p.get("username")]
+    ...
+    if len(attempts) < 5:
+        return None
+    if len({u for u in usernames if u}) < 4:
+        return None
+    return TTPMatch(technique_id="T1110.004", ...)
+"""
+
+[fixture]
+events_json = "ssh-cred-stuffing"
+expected = true
+
+[[blocks]]
+kind = "prose"
+text = "Collect the attempts and the usernames they carried. Two thresholds: enough attempts, and enough DISTINCT usernames."
+
+[[blocks]]
+kind = "code"
+target = "attempts = ctx.payloads(EventType.SSH_AUTH_ATTEMPT)"
+annotation = "Every SSH auth attempt payload in the session."
+
+[[blocks]]
+kind = "code"
+target = "usernames = [p.get(\"username\") for p in attempts if p.get(\"username\")]"
+annotation = "Pull the username from each — this list may contain duplicates; we de-dupe next."
+
+[[blocks]]
+kind = "code"
+target = "if len(attempts) < 5:"
+annotation = "Need volume first — a couple of attempts is just a typo."
+
+[[blocks]]
+kind = "code"
+target = "    return None"
+annotation = "Too few attempts; not stuffing."
+
+[[blocks]]
+kind = "code"
+target = "if len({u for u in usernames if u}) < 4:"
+annotation = "The set comprehension de-dupes. Many attempts but one username = guessing, not stuffing."
+
+[[blocks]]
+kind = "code"
+target = "    return None"
+annotation = "Not enough distinct usernames; let the guessing rule own this one."
+
+[[blocks]]
+kind = "choice"
+prompt = "A session has 30 attempts, all for username 'root'. Which rule(s) fire?"
+options = [
+  "Both guessing and stuffing",
+  "Only password guessing (T1110.001) — one username fails the distinct-username gate",
+  "Only stuffing (T1110.004)",
+  "Neither",
+]
+correct = 1
+explanation = "30 > 5 so guessing fires, but 1 distinct username < 4 so stuffing does not. The distinct-username gate is what separates the two."

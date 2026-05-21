@@ -1,0 +1,102 @@
+id = "detect-valid-accounts"
+family = "defend"
+title = "Detect valid-account use (T1078)"
+blurb = "Fire only when a granted login is actually USED post-auth."
+ttps = ["T1078"]
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1078 — *Valid Accounts*
+
+The most dangerous signal: the attacker didn't just knock — they got in and
+*used* it. This rule needs two facts in one SSH session:
+
+1. a `SSH_AUTH_ATTEMPT` with `success == True` (the login worked), and
+2. at least one `SSH_COMMAND` after it (they did something).
+
+A granted login alone is suggestive; pairing it with a command is direct
+evidence of account use, so the confidence is high (0.90) and it adds a
++25 privilege bonus to the threat score.
+
+Type the two-part check. The fixture has a granted auth + a `whoami`
+command, so it fires.
+"""
+
+reference_source_excerpt = """
+def _valid_accounts_rule(ctx):
+    if ctx.service != "ssh":
+        return None
+    granted = any(
+        (ev.get("payload") or {}).get("success") is True
+        for ev in ctx.events
+        if ev.get("event_type") == EventType.SSH_AUTH_ATTEMPT.value)
+    if not granted:
+        return None
+    used = any(
+        ev.get("event_type") == EventType.SSH_COMMAND.value
+        for ev in ctx.events)
+    if not used:
+        return None
+    return TTPMatch(technique_id="T1078", ...)
+"""
+
+[fixture]
+events_json = "ssh-valid-account"
+expected = true
+
+[[blocks]]
+kind = "prose"
+text = "Two any() checks. First: did any auth attempt succeed? Second: did any command follow? Both must be true."
+
+[[blocks]]
+kind = "code"
+target = "if ctx.service != \"ssh\":"
+annotation = "Valid-account-use evidence here is SSH-shell shaped; bail on other services."
+
+[[blocks]]
+kind = "code"
+target = "    return None"
+annotation = "Not SSH."
+
+[[blocks]]
+kind = "code"
+target = "granted = any("
+annotation = "any() short-circuits on the first granted attempt."
+
+[[blocks]]
+kind = "code"
+target = "    (ev.get(\"payload\") or {}).get(\"success\") is True"
+annotation = "Note: the field is `success`, an explicit True — not just truthy — so a missing field never counts as a grant."
+
+[[blocks]]
+kind = "code"
+target = "if not granted:"
+annotation = "No successful login → this is just brute force, not account USE."
+
+[[blocks]]
+kind = "code"
+target = "    return None"
+annotation = "Let the brute-force rule own it."
+
+[[blocks]]
+kind = "code"
+target = "used = any("
+annotation = "Did they run anything post-auth?"
+
+[[blocks]]
+kind = "code"
+target = "    ev.get(\"event_type\") == EventType.SSH_COMMAND.value for ev in ctx.events"
+annotation = "One SSH_COMMAND is enough to prove the credential was used, not just obtained."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why require a post-auth command, not just a successful login?"
+options = [
+  "Logins are unreliable",
+  "A grant alone might be the honeypot's granted-after-N policy; a follow-up command proves the attacker actually operated the session",
+  "Commands are easier to detect",
+  "MITRE requires two events",
+]
+correct = 1
+explanation = "The honeypot deliberately grants some logins to keep attackers engaged. The command is what upgrades 'got a shell' to 'used the account' — the actual T1078 behaviour."

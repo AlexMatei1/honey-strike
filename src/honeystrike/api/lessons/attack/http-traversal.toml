@@ -1,0 +1,46 @@
+id = "http-traversal"
+family = "attack"
+title = "Path traversal (../../etc/passwd)"
+blurb = "Climb out of the web root with ../ sequences to read system files."
+ttps = ["T1083"]
+difficulty = "easy"
+typing_model = "cli"
+
+briefing = """
+**MITRE ATT&CK:** T1083 — *File and Directory Discovery*
+
+Path traversal abuses an app that builds a filesystem path from user input
+without normalising it. `?path=../../../etc/passwd` walks up out of the
+web root and reads an arbitrary file. Defenders see the literal `../`
+sequence (or its URL-encoded `..%2f` / double-encoded `..%252f` variants)
+and set a `path_traversal` flag on the request, which the
+`_file_discovery_rule` reads to fire T1083.
+
+The runner builds the path with N repeated `../` segments and an optional
+encoding. Type the plain-encoding probe below.
+"""
+
+[live]
+scenario = "http-traversal"
+default_target = "http-honeypot:80"
+
+[[blocks]]
+kind = "prose"
+text = "Five ../ segments is plenty to climb from a typical web root to /. We target a `path=` query parameter — the classic sink."
+
+[[blocks]]
+kind = "shell"
+target = "curl -s 'http://http-honeypot:80/files?path=../../../../../etc/passwd'"
+annotation = "Each ../ goes up one directory. Single quotes stop the shell from touching the slashes. The honeypot flags path_traversal=true on this request."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why try the `..%2f` and `..%252f` encodings as well as plain `../`?"
+options = [
+  "They're faster",
+  "Some filters strip literal ../ but miss URL-encoded or double-encoded forms",
+  "The server requires encoding",
+  "To avoid logging",
+]
+correct = 1
+explanation = "Naive input filters often blocklist the literal '../' but decode the input afterward — so an encoded form slips past the filter and still resolves to ../ at the filesystem."

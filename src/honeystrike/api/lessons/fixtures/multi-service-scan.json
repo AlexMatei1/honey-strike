@@ -1,0 +1,13 @@
+{
+  "service": "ssh",
+  "src_ip": "203.0.113.77",
+  "started_at": "2026-05-18T15:00:00Z",
+  "sibling_sessions": [
+    {"src_ip": "203.0.113.77", "service": "http", "started_at": "2026-05-18T15:00:05Z"},
+    {"src_ip": "203.0.113.77", "service": "ftp",  "started_at": "2026-05-18T15:00:12Z"},
+    {"src_ip": "203.0.113.77", "service": "tls",  "started_at": "2026-05-18T15:00:18Z"}
+  ],
+  "events": [
+    {"event_type": "SSH_AUTH_ATTEMPT", "ts": "2026-05-18T15:00:00Z", "payload": {"username": "root", "password": "root", "success": false}}
+  ]
+}

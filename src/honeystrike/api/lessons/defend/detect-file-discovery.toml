@@ -1,0 +1,79 @@
+id = "detect-file-discovery"
+family = "defend"
+title = "Detect file & directory discovery (T1083)"
+blurb = "Catch ../ traversal or post-shell ls/cat/find commands."
+ttps = ["T1083"]
+difficulty = "easy"
+typing_model = "python"
+
+briefing = """
+**MITRE ATT&CK:** T1083 — *File and Directory Discovery*
+
+After getting in, attackers look around: `ls`, `cat`, `find`, `pwd`. Over
+HTTP, the equivalent is path traversal. This rule covers both branches —
+HTTP `path_traversal` flag, or an SSH command matching a discovery-token
+regex (`ls|dir|find|cat|cd|pwd|ps|tree|locate|stat|wc|head|tail`).
+
+Type the SSH branch. The fixture is an SSH session with a `cat /etc/passwd`
+command, so the regex matches and the rule fires.
+"""
+
+reference_source_excerpt = """
+_DISCOVERY_TOKENS = re.compile(
+    r"\\b(?:ls|dir|find|cat|cd|pwd|ps|tree|locate|stat|wc|head|tail)\\b", re.I)
+
+def _file_discovery_rule(ctx):
+    elif ctx.service == "ssh":
+        for ev in ctx.events:
+            if ev.get("event_type") != EventType.SSH_COMMAND.value:
+                continue
+            raw = (ev.get("payload") or {}).get("raw") or ""
+            if _DISCOVERY_TOKENS.search(raw):
+                return TTPMatch(technique_id="T1083", ...)
+    return None
+"""
+
+[fixture]
+events_json = "ssh-discovery"
+expected = true
+
+[[blocks]]
+kind = "prose"
+text = "We only care about SSH_COMMAND events here. For each, pull the raw command text and test it against the discovery-token regex."
+
+[[blocks]]
+kind = "code"
+target = "for ev in ctx.events:"
+annotation = "Walk the session's events in order."
+
+[[blocks]]
+kind = "code"
+target = "    if ev.get(\"event_type\") != EventType.SSH_COMMAND.value:"
+annotation = "Auth attempts and banners aren't commands — skip them."
+
+[[blocks]]
+kind = "code"
+target = "        continue"
+annotation = "Not a command event."
+
+[[blocks]]
+kind = "code"
+target = "    raw = (ev.get(\"payload\") or {}).get(\"raw\") or \"\""
+annotation = "The literal command line the attacker typed. Default to empty string so the regex never sees None."
+
+[[blocks]]
+kind = "code"
+target = "    if _DISCOVERY_TOKENS.search(raw):"
+annotation = "Word-boundary regex so 'cat' matches but 'category' doesn't. One match is enough to fire."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why use \\b word boundaries in the token regex?"
+options = [
+  "Speed",
+  "To avoid false positives like 'lscpu' or 'category' matching 'ls'/'cat'",
+  "Regex requires it",
+  "To match more commands",
+]
+correct = 1
+explanation = "Without \\b, 'ls' would match inside 'tools', 'cat' inside 'category'. Word boundaries keep it to the actual commands."
