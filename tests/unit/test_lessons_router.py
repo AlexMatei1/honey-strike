@@ -53,18 +53,24 @@ def test_catalogue_groups_by_family() -> None:
     assert len(set(by_family["defend"])) == len(by_family["defend"])
 
 
-def test_every_defender_lesson_has_matching_reference_rule() -> None:
+def test_every_fixture_backed_defender_lesson_has_matching_reference_rule() -> None:
+    # Prediction-style lessons (no [fixture]) are exempt — they have no rule
+    # to grade against (e.g. score-threat teaches the scoring formula).
     for path in DEFEND_LESSONS:
         with path.open("rb") as f:
             doc = tomllib.load(f)
+        if "fixture" not in doc:
+            continue
         assert doc["id"] in lessons_mod._DEFENDER_RULES, \
-            f"defender lesson {doc['id']!r} has no entry in _DEFENDER_RULES"
+            f"defender lesson {doc['id']!r} has a fixture but no entry in _DEFENDER_RULES"
 
 
-def test_every_defender_lesson_has_a_fixture_file() -> None:
+def test_every_fixture_backed_defender_lesson_has_a_fixture_file() -> None:
     for path in DEFEND_LESSONS:
         with path.open("rb") as f:
             doc = tomllib.load(f)
+        if "fixture" not in doc:
+            continue
         fx_name = doc.get("fixture", {}).get("events_json")
         assert fx_name, f"{path.name} has no fixture.events_json"
         fx_path = _LESSONS_DIR / "fixtures" / f"{fx_name}.json"

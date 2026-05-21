@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from honeystrike.core.event_bus import EventBus
 from honeystrike.core.events import EventEnvelope, EventType
+from honeystrike.core.live_feed import publish_live
 from honeystrike.core.logging import get_logger
 from honeystrike.core.models import Fingerprint
 from honeystrike.core.models import Session as SessionModel
@@ -306,6 +307,25 @@ class FingerprintWorker:
                     session_id=buf.session_id,
                     error=str(exc),
                 )
+
+        # Fan out to the dashboard live feed (Redis pub/sub). Best-effort —
+        # publish_live swallows its own errors so it can't break enrichment.
+        await publish_live(
+            self._redis,
+            {
+                "type": "session",
+                "session_id": buf.session_id,
+                "src_ip": src_ip_clean,
+                "service": buf.service,
+                "severity": threat.severity,
+                "threat_score": threat.score,
+                "country_iso": geo_record.country_iso,
+                "lat": geo_record.lat,
+                "lon": geo_record.lon,
+                "started_at": datetime.now(UTC).isoformat(),
+                "ttp_count": len(ttp_matches),
+            },
+        )
 
     async def _upsert_fingerprint(                         # pragma: no cover
         self,

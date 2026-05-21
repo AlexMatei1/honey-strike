@@ -76,12 +76,27 @@ annotation = "Different IP; skip."
 
 [[blocks]]
 kind = "code"
-target = "    seen.add(sess.get(\"service\"))"
-annotation = "(After the 60s time check.) Add the sibling's service to the set."
+target = "        sess_started = sess.get(\"started_at\")"
+annotation = "We need the sibling's start time to check it's within the burst window."
 
 [[blocks]]
 kind = "code"
-target = "if len(seen) < 2:"
+target = "        if abs((sess_started - ctx.started_at).total_seconds()) <= 60:"
+annotation = "The 60-second burst window — only correlate sessions close in time."
+
+[[blocks]]
+kind = "code"
+target = "            svc = sess.get(\"service\")"
+annotation = "Pull the sibling's service name."
+
+[[blocks]]
+kind = "code"
+target = "                seen.add(svc)"
+annotation = "Add it to the set. Distinct services from one IP in the window accumulate here."
+
+[[blocks]]
+kind = "code"
+target = "    if len(seen) < 2:"
 annotation = "One service = a normal connection. Two or more from one IP in 60s = scanning."
 
 [[blocks]]

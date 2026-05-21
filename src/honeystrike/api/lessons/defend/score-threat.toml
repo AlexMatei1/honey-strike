@@ -1,0 +1,95 @@
+id = "score-threat"
+family = "defend"
+title = "Read the threat-score formula"
+blurb = "Decompose a 0–100 score into its four weighted components."
+ttps = []
+difficulty = "medium"
+typing_model = "python"
+
+briefing = """
+**Concept:** how HoneyStrike turns enrichment into one 0–100 number.
+
+Every scored session shows a threat score and a severity band. The formula
+([`threat_scoring.score_session`](src/honeystrike/workers/intel/threat_scoring.py))
+is deliberately transparent so you can reproduce it by hand:
+
+| Component | Weight | Cap |
+|---|---|---|
+| `abuse`     | `round(abuse_score × 0.40)` | 0–40 |
+| `tool`      | `15 × (tools with confidence ≥ 0.70)` | 0–30 |
+| `ttp`       | `round(50 × mean TTP confidence)` | 0–50 |
+| `privilege` | `+25` if T1078 (Valid Accounts) fired | 0–25 |
+
+`score = clamp(0, 100, sum)`. Severity buckets: **low** < 20, **medium** <
+50, **high** < 80, **critical** ≥ 80.
+
+You'll type the component calculations, then predict the band for a worked
+example. No fixture grader here — this lesson is about *reading* the score,
+not firing a rule.
+"""
+
+[[blocks]]
+kind = "prose"
+text = "Abuse first. AbuseIPDB gives a 0–100 confidence; we weight it 40% and cap at 40. A None abuse score counts as 0."
+
+[[blocks]]
+kind = "code"
+target = "abuse_component = round((abuse_score or 0) * _ABUSE_WEIGHT)"
+annotation = "_ABUSE_WEIGHT is 0.40. `abuse_score or 0` turns a missing score into 0 cleanly."
+
+[[blocks]]
+kind = "code"
+target = "abuse_component = max(0, min(40, abuse_component))"
+annotation = "Clamp to 0–40 so abuse can never dominate the whole score on its own."
+
+[[blocks]]
+kind = "prose"
+text = "Tools next. We don't sum confidences — we COUNT how many distinct high-confidence tools fired, then weight each by 15 (capped at 30, so two strong tools max it out)."
+
+[[blocks]]
+kind = "code"
+target = "high_conf_tools = sum(1 for t in tool_matches if t.confidence >= _TOOL_CONFIDENCE_FLOOR)"
+annotation = "_TOOL_CONFIDENCE_FLOOR is 0.70 — a weak PuTTY guess (0.30) doesn't count."
+
+[[blocks]]
+kind = "code"
+target = "tool_component = min(_TOOL_CAP, _TOOL_WEIGHT * high_conf_tools)"
+annotation = "_TOOL_WEIGHT=15, _TOOL_CAP=30. One strong tool → 15, two or more → 30."
+
+[[blocks]]
+kind = "prose"
+text = "TTPs are the heaviest single component (cap 50). We use the MEAN confidence across all matched techniques, not the sum — so one weak match doesn't drag a strong one down much, and ten matches don't runaway."
+
+[[blocks]]
+kind = "code"
+target = "mean_ttp_conf = sum(m.confidence for m in ttp_matches) / len(ttp_matches)"
+annotation = "Mean confidence across every TTP that fired on the session."
+
+[[blocks]]
+kind = "code"
+target = "ttp_component = min(_TTP_CAP, round(_TTP_CAP * mean_ttp_conf))"
+annotation = "_TTP_CAP=50. mean confidence 0.9 → 45 points."
+
+[[blocks]]
+kind = "choice"
+prompt = "A session: abuse_score=50, one tool at 0.95 conf, TTPs T1110.001 (0.90) + T1078 (0.90). What's the score?"
+options = [
+  "≈ 20 (low)",
+  "≈ 45 (medium)",
+  "≈ 60 (high)",
+  "≈ 85 (critical)",
+]
+correct = 3
+explanation = "abuse=round(50*0.4)=20, tool=15, ttp=round(50*0.90)=45, privilege=+25 (T1078). Sum=105 → clamped to 100 → critical."
+
+[[blocks]]
+kind = "choice"
+prompt = "Why does T1078 (Valid Accounts) get a flat +25 bonus instead of just contributing to the TTP mean?"
+options = [
+  "It's a bug",
+  "Account use is qualitatively worse than reconnaissance — a flat bonus guarantees it pushes the session toward critical regardless of the other TTPs",
+  "T1078 has the highest confidence",
+  "To match AbuseIPDB",
+]
+correct = 1
+explanation = "Mean-confidence math would let a single recon TTP dilute a real breach. The flat privilege bonus ensures 'they actually got in and used it' lands high on its own."

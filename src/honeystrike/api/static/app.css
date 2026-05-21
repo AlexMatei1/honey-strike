@@ -1416,3 +1416,40 @@ tr.empty td { color: var(--muted); text-align: center; padding: 16px; }
 
 /* Active dock indicator override for our nav-active style */
 .topbar nav a.nav-active { color: var(--honey); }
+
+/* ============================================================
+   Accessibility
+   ============================================================ */
+
+/* Visible keyboard-focus ring everywhere (the dock, command palette,
+   lesson buttons, etc.). Mouse users don't see it thanks to :focus-visible. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+.dock-btn:focus-visible,
+.cmdk-item:focus-visible {
+  outline: 2px solid var(--honey-hi);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Respect the OS "reduce motion" setting: kill the decorative animations
+   (mascot flapping, threat-border pulse, scanlines shimmer, marker pulse,
+   sparkles, dock hover lift, score-bar slide) while keeping layout intact.
+   Honour it for users who asked their system not to animate. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  body::before { background: none; }          /* drop scanlines */
+  .dock-btn:hover { transform: none; }
+  .attack-marker.critical { animation: none; }
+  .mascot .wing, .mascot-mini .wing { animation: none !important; }
+}

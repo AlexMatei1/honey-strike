@@ -164,6 +164,9 @@
       const li = document.createElement('li');
       li.className = 'cmdk-item' + (i === sel ? ' sel' : '');
       li.dataset.idx = String(i);
+      li.id = `cmdk-item-${i}`;
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', i === sel ? 'true' : 'false');
       li.innerHTML = `<span class="cmdk-icon">${it.icon || '•'}</span><span class="cmdk-title">${escapeHtml(it.title)}</span><span class="cmdk-sub">${escapeHtml(it.sub || '')}</span>`;
       li.addEventListener('mousemove', () => { sel = i; paintSelected(); });
       li.addEventListener('click', () => fire(i));
@@ -173,10 +176,17 @@
 
   function paintSelected() {
     list.querySelectorAll('.cmdk-item').forEach((el) => {
-      el.classList.toggle('sel', Number(el.dataset.idx) === sel);
+      const on = Number(el.dataset.idx) === sel;
+      el.classList.toggle('sel', on);
+      el.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     const cur = list.querySelector('.cmdk-item.sel');
-    if (cur) cur.scrollIntoView({ block: 'nearest' });
+    if (cur) {
+      cur.scrollIntoView({ block: 'nearest' });
+      input.setAttribute('aria-activedescendant', cur.id);
+    } else {
+      input.removeAttribute('aria-activedescendant');
+    }
   }
 
   function fire(i) {

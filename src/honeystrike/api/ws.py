@@ -23,15 +23,20 @@ client passes the access token as `?token=...`. Mitigations:
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 from datetime import UTC, datetime
 from typing import Any
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from honeystrike.api.auth import ACCESS_TOKEN_TYPE, decode_token
+from honeystrike.config import get_settings
 from honeystrike.core.db import get_sessionmaker
+from honeystrike.core.live_feed import LIVE_CHANNEL
 from honeystrike.core.logging import get_logger
 from honeystrike.core.models import Fingerprint, Session, TTPMatch
 
@@ -137,24 +142,46 @@ async def live_feed(
 
     sessionmaker = get_sessionmaker()
     # Initial seed: send the most recent N high-severity sessions so the UI
-    # can hydrate its map without waiting a polling tick.
+    # can hydrate its map without waiting for new traffic.
     cursor = await _seed_initial_state(websocket, sessionmaker, INITIAL_SEED_LIMIT)
     if cursor is None:
         # Connection closed mid-seed.
         return
 
+    # Live updates arrive via Redis pub/sub — the FingerprintWorker publishes
+    # one message per scored session to `LIVE_CHANNEL`. This replaces the old
+    # per-client Postgres polling, so DB load no longer scales with open tabs.
+    redis = aioredis.from_url(get_settings().redis_url)
+    pubsub = redis.pubsub()
+    await pubsub.subscribe(LIVE_CHANNEL)
     try:
         while True:
-            await asyncio.sleep(poll)
-            async with sessionmaker() as db:
-                batch = await _fetch_sessions_since(db, cursor=cursor)
-            for msg in batch:
-                cursor_iso = msg.pop("_cursor", None)
-                if cursor_iso:
-                    cursor = datetime.fromisoformat(cursor_iso)
-                await websocket.send_json(msg)
+            msg = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=poll,
+            )
+            if msg is None:
+                # Heartbeat the socket so dead connections surface promptly and
+                # proxies don't idle us out.
+                await websocket.send_json({"type": "ping"})
+                continue
+            data = msg.get("data")
+            if isinstance(data, bytes):
+                data = data.decode("utf-8", "replace")
+            if not isinstance(data, str):
+                continue
+            try:
+                payload = json.loads(data)
+            except (ValueError, TypeError):
+                continue
+            await websocket.send_json(payload)
     except WebSocketDisconnect:
         log.info("ws.disconnected", subject=subject)
+    finally:
+        with contextlib.suppress(Exception):
+            await pubsub.unsubscribe(LIVE_CHANNEL)
+            await pubsub.aclose()
+        with contextlib.suppress(Exception):
+            await redis.aclose()
 
 
 async def _seed_initial_state(                            # pragma: no cover

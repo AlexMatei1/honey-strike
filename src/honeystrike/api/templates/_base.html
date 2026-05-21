@@ -22,12 +22,14 @@
       <kbd>Ctrl K</kbd>
     </button>
 
-    <span class="xp-badge" id="xp-badge" title="HoneyStrike XP — earn it by completing lessons, grading detections, and blocking attackers.">
-      <span class="xp-icon">⚡</span><span class="xp-value" id="xp-value">0</span> XP
+    <span class="xp-badge" id="xp-badge" role="status"
+          aria-label="HoneyStrike XP — earned by completing lessons, grading detections, and blocking attackers."
+          title="HoneyStrike XP — earn it by completing lessons, grading detections, and blocking attackers.">
+      <span class="xp-icon" aria-hidden="true">⚡</span><span class="xp-value" id="xp-value">0</span> XP
       <span class="xp-streak" id="xp-streak" hidden>🔥<span id="xp-streak-value">0</span></span>
     </span>
 
-    <a href="/profile" class="topbar-avatar" data-nav="profile" title="Profile">👤</a>
+    <a href="/profile" class="topbar-avatar" data-nav="profile" title="Profile" aria-label="Profile">👤</a>
     <button id="logout-btn" type="button">Logout</button>
 
     {# Legacy nav — kept (hidden via CSS) for any anchor still pointed at it. #}
@@ -59,12 +61,16 @@
   </nav>
 
   {# Command-palette overlay (filled by command_palette.js). #}
-  <div class="cmdk-overlay" id="cmdk-overlay" hidden>
+  <div class="cmdk-overlay" id="cmdk-overlay" role="dialog" aria-modal="true"
+       aria-label="Command palette" hidden>
     <div class="cmdk-card">
       <div class="cmdk-input-wrap">
-        <input id="cmdk-input" type="text" placeholder="Type to jump anywhere — pages, sessions, lessons, scenarios…" autocomplete="off" spellcheck="false">
+        <input id="cmdk-input" type="text"
+               aria-label="Search and commands" aria-controls="cmdk-list"
+               placeholder="Type to jump anywhere — pages, sessions, lessons, scenarios…"
+               autocomplete="off" spellcheck="false">
       </div>
-      <ul class="cmdk-list" id="cmdk-list"></ul>
+      <ul class="cmdk-list" id="cmdk-list" role="listbox" aria-label="Results"></ul>
     </div>
   </div>
 

@@ -170,7 +170,9 @@
     if (blockIdx >= lesson.blocks.length) {
       replayBtn.disabled = !lesson.fixture;
       fireBtn.disabled = !lesson.live;
-      if (family === 'defend') {
+      // Grade button only applies to defender lessons that ship a fixture +
+      // reference rule. Prediction-style lessons (e.g. score-threat) omit it.
+      if (family === 'defend' && lesson.fixture) {
         gradeBtn.hidden = false;
         gradeBtn.disabled = false;
       }
