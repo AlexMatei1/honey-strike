@@ -116,26 +116,39 @@ The result is one repo that works as a production honeypot, a SOC training platf
 
 ## Live screenshots — the dashboard tour
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 🐝 HoneyStrike /v1               Search & commands  ⌘K     ⚡145 XP  👤    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   Sessions(24h)   Unique IPs    Avg score    Critical                      │
-│   ┃   427      ┃ ┃   10     ┃ ┃   38.4   ┃ ┃   14    ┃                    │
-│                                                                             │
-│   ┌────────── world attack map ──────────┐  ┌─── Recent sessions ───┐     │
-│   │   ●     ●         ●●                  │  │ 14:02  ssh   1.2.3.4 │     │
-│   │     ●            ●   ●                │  │ 14:01  http  9.8.7.6 │     │
-│   │           ●   ●       ●               │  │ 13:59  ftp   5.4.3.2 │     │
-│   │   ●●         ●                        │  │ 13:58  ssh   1.2.3.4 │     │
-│   └───────────────────────────────────────┘  └──────────────────────┘     │
-│                                                                             │
-│                         🗺  📋  📊  | 🎮  📡  | 👤  ⌘                    │ ◄ dock
-└─────────────────────────────────────────────────────────────────────────────┘
-                                                  ◄ live threat-level border
-                                                    pulses red on every critical
-```
+> Captured by the Playwright suite in [`tests/e2e/`](tests/e2e/) — regenerate any time with `npm run shots`.
+
+### Live attack map
+Leaflet world map, recent-sessions sidebar, four stat tiles, floating dock, ambient threat-level border.
+
+![Live map](docs/screenshots/live-map.png)
+
+### Attack lesson — learn by typing
+Briefing + MITRE context on the left, the animated bee mascot on the right, a block-by-block typing stage with per-line annotations. Tab autocompletes, Esc reveals.
+
+![Attack lesson](docs/screenshots/lesson-attack.png)
+
+### Defender lesson — write the detection rule
+Type the real TTP-rule body; the grader runs the reference rule against a fixture and shows the result + source excerpt.
+
+![Defender lesson](docs/screenshots/lesson-defend.png)
+
+### Profile — rank, XP, badges
+Rank ladder with XP progress bar, all-time stats, and a 15-badge grid that unlocks as you play.
+
+![Profile](docs/screenshots/profile.png)
+
+### Command palette (⌘K)
+Fuzzy-jump to any page, session, or lesson — or fire any attack scenario straight from the prompt.
+
+![Command palette](docs/screenshots/command-palette.png)
+
+### War Room
+Full-screen takeover for a wall display: huge stats, world map, and a scrolling attack ticker.
+
+![War Room](docs/screenshots/warroom.png)
+
+### Page reference
 
 | Page | Highlight |
 |---|---|
@@ -393,7 +406,8 @@ honey-strike/
 │       ├── alerting/ channels.py · dispatch.py
 │       └── reports/  pdf_renderer.py · queue_consumer.py
 ├── tests/
-│   ├── unit/                         ▸ 201 unit tests (pytest, asyncio mode auto)
+│   ├── unit/                         ▸ 248 unit tests (pytest, asyncio mode auto)
+│   ├── e2e/                          ▸ Playwright smoke tests + screenshot capture
 │   └── integration/                  ▸ 34 live tests against the running stack
 ├── docker-compose.dev.yml            ▸ full stack for dev
 ├── docker-compose.prod.yml           ▸ prod profile + Caddy reverse proxy
@@ -585,10 +599,11 @@ docker exec honeystrike-api pytest tests/integration -q
 docker exec honeystrike-api pytest -q
 ```
 
-- **201 unit tests** — covering events, models, session manager, every listener, the intel pipeline (geo / abuse / signatures / fingerprint / ttp_rules / threat_scoring), alerting channels, reports, STIX/TAXII, the lobby store, the lessons router, and the CLI.
+- **248 unit tests** — covering events, models, session manager, every listener (incl. Telnet/SMTP/Redis protocol parsers), the intel pipeline (geo / abuse / signatures / fingerprint / ttp_rules / threat_scoring), alerting channels, reports, STIX/TAXII, the lobby store, the lessons router + drift guard, the play rate-limiter, the live-feed pub/sub, and the CLI.
 - **34 integration tests** — full-stack against the running compose stack (SSH brute, HTTP recon, sqlmap, log4shell, traversal, FTP brute, RDP scan, TLS JA3, replay, lobby register/invite/accept, defender block, canary capture).
+- **8 Playwright e2e smoke tests** + screenshot capture in [`tests/e2e/`](tests/e2e/) — log in, load every page, assert the dock/map/lessons/badges/command-palette render. Run with `cd tests/e2e && npm install && npm run install-browser && npm test`.
 - **Coverage gate**: 80% (CI fails below).
-- **Two env-only flakes** in some setups: `test_ml_anomaly` (needs sklearn pre-installed in the api image — by default it's in the worker image) and `test_report_renderer` (needs WeasyPrint native libs — lives in the reports container). Both routinely deselected when running the suite from inside the api container.
+- **Portable by default**: the two heavy-dep tests (`test_ml_anomaly` needs scikit-learn, `test_report_renderer` needs WeasyPrint native libs) **skip cleanly** when the dep is absent, so `pytest tests/unit` is green on any checkout.
 
 See [`TESTING.md`](TESTING.md) for the full matrix + manual smoke procedures.
 

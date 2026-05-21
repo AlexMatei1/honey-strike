@@ -1,0 +1,14 @@
+{
+  "name": "honeystrike-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright smoke tests + screenshot capture for the HoneyStrike dashboard",
+  "scripts": {
+    "test": "playwright test",
+    "shots": "playwright test screenshots.spec.js",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
