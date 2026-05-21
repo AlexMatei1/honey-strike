@@ -60,7 +60,7 @@ tenacity = "^9.0.0"
 # CLI + multiplayer (Phase 6)
 typer = "^0.15.0"
 tomli-w = "^1.0.0"
-websockets = "^14.0"
+websockets = ">=14,<17"
 
 [tool.poetry.scripts]
 honeystrike = "honeystrike.cli:app"
