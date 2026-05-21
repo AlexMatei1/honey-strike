@@ -303,6 +303,18 @@ Latency from "attacker sends bytes" to "session enriched + alert fired + UI upda
 
 ---
 
+## Try it without deploying
+
+Want to click around first? Stand up a **read-only demo** (dashboard + synthetic
+data, no live capture ports) in one command — or one click on Render/Fly. See
+[`DEMO_DEPLOY.md`](DEMO_DEPLOY.md).
+
+```bash
+cp .env.demo.example .env.demo      # set ADMIN_PASSWORD + JWT_SECRET
+docker compose -f docker-compose.demo.yml up -d --build
+# → http://localhost:8001/login
+```
+
 ## Quick start (development)
 
 You'll need: **Docker Desktop** (Compose v2), or Python 3.13 + Poetry if you want to run pieces outside containers.

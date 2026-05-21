@@ -1,0 +1,76 @@
+# =============================================================================
+# HoneyStrike — DEMO stack
+#
+# A minimal, self-contained stack for a *public read-only demo*: Postgres +
+# Redis + the dashboard API, plus a one-shot job that runs migrations and
+# seeds synthetic attacker data so the dashboard isn't empty.
+#
+# It deliberately does NOT run the honeypot listeners — a public demo
+# shouldn't expose live capture ports. The data is synthetic (RFC 5737 IPs).
+#
+#   docker compose -f docker-compose.demo.yml up -d --build
+#   # → open http://<host>:8001/login   (admin / the password in .env.demo)
+#
+# For a real capture deployment use docker-compose.prod.yml instead.
+# =============================================================================
+
+x-demo-base: &demo-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: honeystrike:demo
+  env_file: .env.demo
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: honeystrike-demo-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-honeystrike}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-demo-only-password}
+      POSTGRES_DB: ${POSTGRES_DB:-honeystrike}
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honeystrike}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: honeystrike-demo-cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: apply migrations, then seed synthetic demo data. Exits 0.
+  init:
+    <<: *demo-base
+    container_name: honeystrike-demo-init
+    restart: "no"
+    command: ["sh", "-c", "alembic upgrade head && python scripts/seed_demo.py --count 250"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dashboard-api:
+    <<: *demo-base
+    container_name: honeystrike-demo-api
+    command: ["python", "-m", "honeystrike.api"]
+    environment:
+      API_LISTEN_HOST: "0.0.0.0"
+      API_LISTEN_PORT: "8000"
+    ports:
+      - "${DASHBOARD_API_HOST_PORT:-8001}:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  demo_pgdata:

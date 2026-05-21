@@ -1,0 +1,50 @@
+# Fly.io config for a HoneyStrike DEMO (read-only dashboard, synthetic data).
+#
+# Prereqs (one-time):
+#   fly launch --no-deploy                 # creates the app
+#   fly postgres create && fly postgres attach <pg-app>   # sets DATABASE_URL*
+#   # Redis: provision Upstash and set REDIS_URL as a secret:
+#   fly redis create                       # or use any Redis URL
+#   fly secrets set ADMIN_PASSWORD=... JWT_SECRET=$(openssl rand -hex 32) \
+#                   REDIS_URL=redis://...
+#   fly deploy
+#
+# * Fly's `postgres attach` sets DATABASE_URL with the postgres:// scheme.
+#   HoneyStrike needs the async driver — set it explicitly:
+#   fly secrets set DATABASE_URL="postgresql+asyncpg://USER:PASS@HOST:5432/DB"
+#
+# Migrations + seed run via the release_command before each deploy goes live.
+
+app = "honeystrike-demo"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  release_command = "sh -c 'alembic upgrade head && python scripts/seed_demo.py --count 250'"
+
+[env]
+  APP_ENV = "production"
+  API_LISTEN_HOST = "0.0.0.0"
+  API_LISTEN_PORT = "8000"
+  ADMIN_USERNAME = "admin"
+
+[processes]
+  app = "python -m honeystrike.api"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    path = "/api/health"
+    interval = "15s"
+    timeout = "3s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

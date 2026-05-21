@@ -1,0 +1,56 @@
+# Render.com blueprint for a one-click HoneyStrike DEMO.
+#
+# Spins up the dashboard API + managed Postgres + managed Key Value (Redis),
+# runs migrations and seeds synthetic data via the pre-deploy command. This is
+# the read-only demo profile — it does NOT run the live honeypot listeners.
+#
+# Deploy: push this repo to GitHub, then in Render → "New +" → "Blueprint" and
+# point it at the repo. Set ADMIN_PASSWORD + JWT_SECRET when prompted.
+#
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: honeystrike-db
+    databaseName: honeystrike
+    user: honeystrike
+    plan: free
+
+services:
+  - type: keyvalue
+    name: honeystrike-redis
+    plan: free
+    ipAllowList: []          # only reachable from Render services
+
+  - type: web
+    name: honeystrike-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    # Migrate + seed before each deploy goes live.
+    preDeployCommand: "alembic upgrade head && python scripts/seed_demo.py --count 250"
+    dockerCommand: "python -m honeystrike.api"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_LISTEN_HOST
+        value: "0.0.0.0"
+      - key: API_LISTEN_PORT
+        value: "8000"
+      - key: PORT                 # Render injects this; mirror to our port
+        value: "8000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: honeystrike-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: honeystrike-redis
+          property: connectionString
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false               # set in the Render dashboard
+      - key: JWT_SECRET
+        generateValue: true       # Render generates a strong secret
