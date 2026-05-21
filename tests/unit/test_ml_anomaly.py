@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from honeystrike.workers.intel.ml_anomaly import (
     FEATURE_NAMES,
     SessionFeatures,
@@ -53,6 +55,7 @@ def test_score_batch_skips_when_too_few_samples() -> None:
 
 
 def test_score_batch_returns_one_result_per_input() -> None:
+    pytest.importorskip("sklearn", reason="scikit-learn not installed in this env")
     # 35 mostly-benign + 5 outliers.
     benign = [_feat([10.0, 0.0, 0.0, 0.0, 1.0, 5.0, 100.0, 0.0]) for _ in range(35)]
     spikes = [_feat([95.0, 90.0, 4.0, 4.0, 9999.0, 500.0, 1.0, 1.0]) for _ in range(5)]
@@ -70,6 +73,7 @@ def test_score_batch_returns_one_result_per_input() -> None:
 
 
 def test_score_batch_marks_some_outliers_as_anomaly() -> None:
+    pytest.importorskip("sklearn", reason="scikit-learn not installed in this env")
     benign = [_feat([10.0, 0.0, 0.0, 0.0, 1.0, 5.0, 100.0, 0.0]) for _ in range(40)]
     spikes = [_feat([99.0, 95.0, 4.0, 4.0, 99999.0, 9999.0, 1.0, 1.0]) for _ in range(3)]
     out = score_batch(benign + spikes, contamination=0.07)

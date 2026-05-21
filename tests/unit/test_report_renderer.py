@@ -17,6 +17,21 @@ from honeystrike.workers.reports.renderer import (
 )
 
 
+def _weasyprint_available() -> bool:
+    """WeasyPrint raises OSError (not ImportError) when its native libs
+    (libpango / libcairo / libgdk-pixbuf) are missing, so pytest.importorskip
+    can't catch it. The reports container ships these libs; a bare dev env
+    may not — skip the PDF roundtrip there rather than hard-fail."""
+    try:
+        import weasyprint  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+_WEASYPRINT = _weasyprint_available()
+
+
 def _ctx(**overrides) -> ReportContext:
     base = ReportContext(
         session={
@@ -125,6 +140,7 @@ def test_render_html_escapes_attacker_payloads() -> None:
 # PDF
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(not _WEASYPRINT, reason="WeasyPrint native libs unavailable in this env")
 def test_render_pdf_returns_valid_pdf_header() -> None:
     pdf_bytes = render_pdf(_ctx())
     # Every valid PDF file starts with `%PDF-` and ends with `%%EOF`.

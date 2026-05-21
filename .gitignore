@@ -42,6 +42,9 @@ poetry.lock.bak
 .DS_Store
 Thumbs.db
 
+# Claude Code — keep personal/local agent settings out of the repo
+.claude/settings.local.json
+
 # Docker
 *.pid
 

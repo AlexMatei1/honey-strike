@@ -7,6 +7,7 @@ hits these endpoints (they're scoped to the local defender's instance).
 
 from __future__ import annotations
 
+import ipaddress
 import uuid
 from typing import Annotated, Any
 
@@ -117,6 +118,15 @@ async def block_ip(
     """Manually add an IP to the block list. Used by `defend label --block` and
     can also be invoked by the operator for ad-hoc blocking."""
     ip_to_block = _sanitise_ip(body.ip)
+    # Reject anything that isn't a real IP so a malformed value can't be
+    # written as a stray Redis blocklist key.
+    try:
+        ipaddress.ip_address(ip_to_block)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"not a valid IP address: {body.ip!r}",
+        ) from exc
     client = _redis_client()
     try:
         await blocklist.add(client, ip_to_block,

@@ -53,6 +53,20 @@ class PlayTask:
 _TASKS: dict[str, PlayTask] = {}
 _TASK_TTL_SECONDS = 600
 
+# ---- Rate limiting --------------------------------------------------------
+# The play endpoints fire real attack traffic at the honeypot. Even though
+# they're auth-gated, a runaway client (or a stolen token) shouldn't be able
+# to spawn unbounded concurrent runs. Two simple in-process guards:
+#   - at most MAX_CONCURRENT tasks in `running` state at once,
+#   - at most MAX_PER_WINDOW launches in a rolling WINDOW_SECONDS.
+# In-process is fine: the dashboard-api is a single process per instance, and
+# the registry is already in-process. Restarting the API resets the window.
+MAX_CONCURRENT = 3
+MAX_PER_WINDOW = 12
+WINDOW_SECONDS = 60.0
+
+_launch_times: list[float] = []
+
 
 def _gc_old_tasks() -> None:
     now = time.time()
@@ -60,6 +74,33 @@ def _gc_old_tasks() -> None:
              if t.finished_at and now - t.finished_at > _TASK_TTL_SECONDS]
     for tid in stale:
         _TASKS.pop(tid, None)
+
+
+def _enforce_rate_limit() -> None:
+    """Raise HTTP 429 if too many concurrent or too-frequent launches.
+
+    Call after `_gc_old_tasks()` so finished tasks don't count toward the
+    concurrency cap."""
+    now = time.time()
+    running = sum(1 for t in _TASKS.values() if t.status == "running")
+    if running >= MAX_CONCURRENT:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"too many concurrent runs ({running}/{MAX_CONCURRENT}); "
+                   "wait for one to finish",
+        )
+    # Slide the launch-time window.
+    cutoff = now - WINDOW_SECONDS
+    _launch_times[:] = [t for t in _launch_times if t > cutoff]
+    if len(_launch_times) >= MAX_PER_WINDOW:
+        retry_after = int(WINDOW_SECONDS - (now - _launch_times[0])) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"launch rate exceeded ({MAX_PER_WINDOW}/{int(WINDOW_SECONDS)}s); "
+                   f"retry in ~{retry_after}s",
+            headers={"Retry-After": str(retry_after)},
+        )
+    _launch_times.append(now)
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +220,7 @@ async def launch_attack(
     _user: Annotated[User, Depends(current_user)],
 ) -> TaskOut:
     _gc_old_tasks()
+    _enforce_rate_limit()
     scenario_meta = next((s for s in _SCENARIOS if s["id"] == body.scenario), None)
     if scenario_meta is None:
         raise HTTPException(status_code=400, detail=f"unknown scenario {body.scenario!r}")
@@ -197,6 +239,7 @@ async def launch_campaign(
     _user: Annotated[User, Depends(current_user)],
 ) -> TaskOut:
     _gc_old_tasks()
+    _enforce_rate_limit()
     if body.name not in campaign_module._PLAYBOOKS:           # noqa: SLF001
         raise HTTPException(status_code=400, detail=f"unknown campaign {body.name!r}")
     playbook = campaign_module._PLAYBOOKS[body.name](body.target_host)  # noqa: SLF001

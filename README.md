@@ -6,6 +6,7 @@
 
 Capture real attackers across **SSH / HTTP / FTP / RDP / TLS**, enrich every session with **geo-IP + abuse reputation + tool fingerprint + MITRE ATT&CK attribution + threat score**, send alerts, render PDF reports, and let your operators **learn to attack and defend by typing real code** — all in one `docker compose up -d`.
 
+[![CI](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-v1.0%20shipped-success?style=flat-square)
 ![python](https://img.shields.io/badge/python-3.13-blue?style=flat-square)
 ![fastapi](https://img.shields.io/badge/FastAPI-async-009688?style=flat-square&logo=fastapi)
