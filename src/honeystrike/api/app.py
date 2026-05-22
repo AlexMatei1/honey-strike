@@ -113,6 +113,12 @@ def create_app() -> FastAPI:
             return HTMLResponse("<h1>HoneyStrike</h1>")
         return templates.TemplateResponse(request, "reset.html", {})
 
+    @app.get("/verify", response_class=HTMLResponse, include_in_schema=False)
+    async def dashboard_verify(request: Request) -> HTMLResponse:
+        if templates is None:
+            return HTMLResponse("<h1>HoneyStrike</h1>")
+        return templates.TemplateResponse(request, "verify.html", {})
+
     @app.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_sessions(request: Request) -> HTMLResponse:
         if templates is None:

@@ -269,6 +269,10 @@ class User(Base):
     )
     username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255))
+    email_verified: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("FALSE")
+    )
     role: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=text("'member'")
     )

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify email — HoneyStrike</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐝</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>🐝 Email verification</h1>
+    <p id="verify-msg" class="muted">Verifying your email…</p>
+    <p class="auth-toggle muted"><a href="/login">→ continue to sign in</a></p>
+  </div>
+  <script>
+    (async function () {
+      const msg = document.getElementById('verify-msg');
+      const token = new URLSearchParams(window.location.search).get('token');
+      if (!token) { msg.textContent = 'Missing verification token.'; msg.className = 'error'; return; }
+      try {
+        const r = await fetch('/api/auth/verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        if (r.ok) {
+          msg.textContent = '✓ Email verified. Thanks!';
+          msg.className = 'ok';
+        } else {
+          msg.textContent = r.status === 401 ? 'This link is invalid or has expired.' : 'Verification failed.';
+          msg.className = 'error';
+        }
+      } catch (e) {
+        msg.textContent = 'Verification failed: ' + e.message;
+        msg.className = 'error';
+      }
+    })();
+  </script>
+</body>
+</html>

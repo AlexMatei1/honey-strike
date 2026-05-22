@@ -34,8 +34,12 @@ from honeystrike.core.models import User
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
 RESET_TOKEN_TYPE = "reset"
+VERIFY_TOKEN_TYPE = "verify"
 REFRESH_COOKIE_NAME = "hs_refresh"
 RESET_TOKEN_TTL_SECONDS = 3600          # one-time reset links live 1 hour
+VERIFY_TOKEN_TTL_SECONDS = 24 * 3600    # email-verify links live 24 hours
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 _hasher = PasswordHasher()
 _bearer = HTTPBearer(auto_error=False)
@@ -195,6 +199,7 @@ class LoginIn(BaseModel):
 class RegisterIn(BaseModel):
     username: str
     password: str
+    email: str | None = None
 
 
 class TokenOut(BaseModel):
@@ -205,12 +210,15 @@ class TokenOut(BaseModel):
 
 class AuthConfigOut(BaseModel):
     allow_registration: bool
+    email_enabled: bool
 
 
 class MeOut(BaseModel):
     username: str
     role: str
     is_admin: bool
+    email: str | None = None
+    email_verified: bool = False
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -242,25 +250,52 @@ def _issue_session(user: User, response: Response) -> TokenOut:
 
 @router.get("/config", response_model=AuthConfigOut)
 async def auth_config() -> AuthConfigOut:
-    """Public — lets the login page show/hide the 'create account' UI."""
-    return AuthConfigOut(allow_registration=get_settings().allow_registration)
+    """Public — lets the login page show/hide the 'create account' + email UI."""
+    from honeystrike.core.mailer import smtp_configured
+    return AuthConfigOut(
+        allow_registration=get_settings().allow_registration,
+        email_enabled=smtp_configured(),
+    )
 
 
 @router.get("/me", response_model=MeOut)
 async def me(user: Annotated[User, Depends(current_user)]) -> MeOut:
     """Current user's identity + role — the frontend uses this to render the
     role badge and lock Lead-only actions."""
-    return MeOut(username=user.username, role=user.role, is_admin=user.role == "admin")
+    return MeOut(
+        username=user.username, role=user.role, is_admin=user.role == "admin",
+        email=user.email, email_verified=user.email_verified,
+    )
+
+
+async def _send_verification(user: User, base_url: str) -> None:
+    """Best-effort: email a verification link (or log it if no SMTP)."""
+    from honeystrike.core.mailer import send_email
+    token = issue_token(
+        subject=user.username, token_type=VERIFY_TOKEN_TYPE,
+        ttl_seconds=VERIFY_TOKEN_TTL_SECONDS,
+    )
+    link = f"{base_url.rstrip('/')}/verify?token={token}"
+    if not user.email:
+        return
+    await send_email(
+        to=user.email,
+        subject="Verify your HoneyStrike email",
+        body=f"Welcome to HoneyStrike, {user.username}.\n\n"
+             f"Confirm your email by opening this link (valid 24h):\n{link}\n",
+    )
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterIn,
+    request: Request,
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenOut:
     """Self-service account creation. Gated by ALLOW_REGISTRATION. On success
-    the new user is logged in immediately (access token + refresh cookie)."""
+    the new user is logged in immediately (access token + refresh cookie). An
+    optional email enables verification + self-service password reset."""
     settings = get_settings()
     if not settings.allow_registration:
         raise HTTPException(
@@ -273,6 +308,11 @@ async def register(
     if err:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=err)
 
+    email = (payload.email or "").strip().lower() or None
+    if email and not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="that doesn't look like a valid email")
+
     # Case-insensitive uniqueness so "Admin" can't shadow "admin".
     existing = (
         await db.execute(
@@ -283,6 +323,13 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="username already taken"
         )
+    if email:
+        dup_email = (
+            await db.execute(select(User).where(func.lower(User.email) == email))
+        ).scalars().first()
+        if dup_email is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail="that email is already registered")
 
     # Rate-limit only *successful* creations (validation/dup failures above are
     # cheap and shouldn't burn a visitor's quota), guarding the costly argon2
@@ -292,6 +339,7 @@ async def register(
     user = User(
         username=username,
         password_hash=hash_password(payload.password),
+        email=email,
         role="member",          # self-service signups are always Analysts
         is_active=True,
         last_login_at=datetime.now(UTC),
@@ -299,7 +347,44 @@ async def register(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    if email:
+        await _send_verification(user, str(request.base_url))
     return _issue_session(user, response)
+
+
+class VerifyIn(BaseModel):
+    token: str
+
+
+@router.post("/verify")
+async def verify_email(
+    payload: VerifyIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Mark the email verified from a valid verify token (public — token is proof)."""
+    claims = decode_token(payload.token, expected_type=VERIFY_TOKEN_TYPE)
+    username = claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+    await db.execute(
+        update(User).where(User.username == username).values(email_verified=True)
+    )
+    await db.commit()
+    return {"ok": True, "username": username}
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    request: Request,
+    user: Annotated[User, Depends(current_user)],
+) -> dict[str, Any]:
+    """Re-send the verification email to the logged-in user's address."""
+    if not user.email:
+        raise HTTPException(status_code=422, detail="no email on file")
+    if user.email_verified:
+        return {"ok": True, "already_verified": True}
+    await _send_verification(user, str(request.base_url))
+    return {"ok": True}
 
 
 class ResetIn(BaseModel):

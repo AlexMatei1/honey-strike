@@ -18,6 +18,9 @@
     <label>Username
       <input type="text" name="username" required autofocus>
     </label>
+    <label id="email-field" hidden>Email <span class="muted">(optional — for verification &amp; reset)</span>
+      <input type="email" name="email" autocomplete="email">
+    </label>
     <label>Password
       <input type="password" name="password" required>
     </label>
@@ -44,9 +47,11 @@
         if (cfg && cfg.allow_registration) toggleWrap.hidden = false;
       }).catch(() => {});
 
+      const emailField = document.getElementById('email-field');
       function setMode(next) {
         mode = next;
         err.hidden = true;
+        emailField.hidden = mode !== 'register';
         if (mode === 'register') {
           subtitle.textContent = 'Create your operator account';
           submitBtn.textContent = 'Create account';
@@ -71,11 +76,13 @@
         err.hidden = true;
         submitBtn.disabled = true;
         const path = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
+        const payload = { username: fd.get('username'), password: fd.get('password') };
+        if (mode === 'register' && fd.get('email')) payload.email = fd.get('email');
         try {
           const r = await fetch(path, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
+            body: JSON.stringify(payload),
             credentials: 'include',
           });
           if (!r.ok) {
