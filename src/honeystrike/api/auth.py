@@ -13,6 +13,8 @@ A FastAPI dependency `current_user` enforces auth on every protected route.
 
 from __future__ import annotations
 
+import re
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -22,7 +24,7 @@ from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from honeystrike.config import get_settings
@@ -35,6 +37,43 @@ REFRESH_COOKIE_NAME = "hs_refresh"
 
 _hasher = PasswordHasher()
 _bearer = HTTPBearer(auto_error=False)
+
+# Username: 3–32 chars, starts alphanumeric, then alphanumerics / _ / - / .
+_USERNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]{2,31}$")
+_PASSWORD_MIN = 8
+_PASSWORD_MAX = 128
+
+
+def validate_registration(username: str, password: str) -> str | None:
+    """Return an error message if the credentials are unacceptable, else None.
+    Pure function so it can be unit-tested without a database."""
+    if not _USERNAME_RE.match(username or ""):
+        return ("username must be 3–32 chars, start with a letter or number, and "
+                "contain only letters, numbers, and . _ -")
+    if not (_PASSWORD_MIN <= len(password or "") <= _PASSWORD_MAX):
+        return f"password must be {_PASSWORD_MIN}–{_PASSWORD_MAX} characters"
+    return None
+
+
+# Simple in-process sliding-window limiter for account creation, so an open
+# demo can't be flooded with sign-ups. Resets when the API restarts.
+_REGISTER_MAX_PER_WINDOW = 10
+_REGISTER_WINDOW_SECONDS = 300.0
+_register_times: list[float] = []
+
+
+def _registration_rate_limit() -> None:
+    now = time.time()
+    cutoff = now - _REGISTER_WINDOW_SECONDS
+    _register_times[:] = [t for t in _register_times if t > cutoff]
+    if len(_register_times) >= _REGISTER_MAX_PER_WINDOW:
+        retry = int(_REGISTER_WINDOW_SECONDS - (now - _register_times[0])) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"too many sign-ups; retry in ~{retry}s",
+            headers={"Retry-After": str(retry)},
+        )
+    _register_times.append(now)
 
 
 # ---------------------------------------------------------------------------
@@ -139,31 +178,26 @@ class LoginIn(BaseModel):
     password: str
 
 
+class RegisterIn(BaseModel):
+    username: str
+    password: str
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
 
 
+class AuthConfigOut(BaseModel):
+    allow_registration: bool
+
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=TokenOut)           # pragma: no cover
-async def login(
-    payload: LoginIn,
-    response: Response,
-    db: Annotated[AsyncSession, Depends(get_db)],
-) -> TokenOut:
-    user = (
-        (await db.execute(select(User).where(User.username == payload.username)))
-        .scalars()
-        .first()
-    )
-    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
-        # Same response for unknown user / wrong password to avoid leaking which is which.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
-        )
+def _issue_session(user: User, response: Response) -> TokenOut:
+    """Issue an access token (returned) + refresh cookie for a logged-in user."""
     settings = get_settings()
     access = issue_token(
         subject=user.username,
@@ -183,16 +217,86 @@ async def login(
         samesite="lax",
         secure=settings.app_env == "production",
     )
+    return TokenOut(access_token=access, expires_in=settings.jwt_access_ttl_seconds)
+
+
+@router.get("/config", response_model=AuthConfigOut)
+async def auth_config() -> AuthConfigOut:
+    """Public — lets the login page show/hide the 'create account' UI."""
+    return AuthConfigOut(allow_registration=get_settings().allow_registration)
+
+
+@router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+async def register(
+    payload: RegisterIn,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenOut:
+    """Self-service account creation. Gated by ALLOW_REGISTRATION. On success
+    the new user is logged in immediately (access token + refresh cookie)."""
+    settings = get_settings()
+    if not settings.allow_registration:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="account registration is disabled on this instance",
+        )
+
+    username = (payload.username or "").strip()
+    err = validate_registration(username, payload.password)
+    if err:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=err)
+
+    # Case-insensitive uniqueness so "Admin" can't shadow "admin".
+    existing = (
+        await db.execute(
+            select(User).where(func.lower(User.username) == username.lower())
+        )
+    ).scalars().first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="username already taken"
+        )
+
+    # Rate-limit only *successful* creations (validation/dup failures above are
+    # cheap and shouldn't burn a visitor's quota), guarding the costly argon2
+    # hash + insert against flooding.
+    _registration_rate_limit()
+
+    user = User(
+        username=username,
+        password_hash=hash_password(payload.password),
+        is_active=True,
+        last_login_at=datetime.now(UTC),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _issue_session(user, response)
+
+
+@router.post("/login", response_model=TokenOut)           # pragma: no cover
+async def login(
+    payload: LoginIn,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenOut:
+    user = (
+        (await db.execute(select(User).where(User.username == payload.username)))
+        .scalars()
+        .first()
+    )
+    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
+        # Same response for unknown user / wrong password to avoid leaking which is which.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
+        )
     await db.execute(
         update(User)
         .where(User.id == user.id)
         .values(last_login_at=datetime.now(UTC))
     )
     await db.commit()
-    return TokenOut(
-        access_token=access,
-        expires_in=settings.jwt_access_ttl_seconds,
-    )
+    return _issue_session(user, response)
 
 
 @router.post("/refresh", response_model=TokenOut)         # pragma: no cover

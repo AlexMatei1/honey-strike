@@ -242,6 +242,11 @@ main {
   border: none;
   font-weight: 600;
 }
+.login-card .auth-toggle {
+  margin: 12px 0 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
 
 /* ---------- Overview cards ---------- */
 .overview {

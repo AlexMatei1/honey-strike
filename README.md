@@ -306,10 +306,11 @@ Latency from "attacker sends bytes" to "session enriched + alert fired + UI upda
 
 ## Try it without deploying
 
-**▶ Live demo: https://honeystrike.icelegends.cloud** — log in with `admin` /
-`change-me-strong-password` and click around (synthetic data; live capture
-ports are closed). Fire an attack from the command palette (⌘K), watch it land
-on the map, then open a typing lesson.
+**▶ Live demo: https://honeystrike.icelegends.cloud** — **create your own
+account** on the login page (or use `admin` / `change-me-strong-password`) and
+click around (synthetic data; live capture ports are closed). Fire an attack
+from the command palette (⌘K), watch it land on the map, then open a typing
+lesson. Each account gets its own profile, XP, and badges.
 
 > The demo may be asleep if the host is offline — the sections below stand up
 > your own copy in one command.

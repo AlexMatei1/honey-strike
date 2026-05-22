@@ -4,48 +4,98 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign in — HoneyStrike</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐝</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body class="login-body">
   <form id="login-form" class="login-card" autocomplete="off">
-    <h1>HoneyStrike</h1>
-    <p class="muted">Sign in to the dashboard</p>
+    <h1>🐝 HoneyStrike</h1>
+    <p class="muted" id="form-subtitle">Sign in to the dashboard</p>
     <label>Username
       <input type="text" name="username" required autofocus>
     </label>
     <label>Password
       <input type="password" name="password" required>
     </label>
-    <button type="submit">Sign in</button>
+    <button type="submit" id="submit-btn">Sign in</button>
     <p id="login-error" class="error" hidden></p>
+    <p class="auth-toggle muted" id="auth-toggle" hidden>
+      <span id="toggle-text">New here?</span>
+      <a href="#" id="toggle-link">Create an account</a>
+    </p>
   </form>
   <script>
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
+    (function () {
+      const form = document.getElementById('login-form');
       const err = document.getElementById('login-error');
-      err.hidden = true;
-      try {
-        const r = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
-          credentials: 'include',
-        });
-        if (!r.ok) {
-          err.textContent = 'Invalid credentials.';
-          err.hidden = false;
-          return;
+      const subtitle = document.getElementById('form-subtitle');
+      const submitBtn = document.getElementById('submit-btn');
+      const toggleWrap = document.getElementById('auth-toggle');
+      const toggleText = document.getElementById('toggle-text');
+      const toggleLink = document.getElementById('toggle-link');
+      let mode = 'login';   // 'login' | 'register'
+
+      // Show the register toggle only if the instance allows it.
+      fetch('/api/auth/config').then(r => r.json()).then(cfg => {
+        if (cfg && cfg.allow_registration) toggleWrap.hidden = false;
+      }).catch(() => {});
+
+      function setMode(next) {
+        mode = next;
+        err.hidden = true;
+        if (mode === 'register') {
+          subtitle.textContent = 'Create your operator account';
+          submitBtn.textContent = 'Create account';
+          toggleText.textContent = 'Already have an account?';
+          toggleLink.textContent = 'Sign in';
+        } else {
+          subtitle.textContent = 'Sign in to the dashboard';
+          submitBtn.textContent = 'Sign in';
+          toggleText.textContent = 'New here?';
+          toggleLink.textContent = 'Create an account';
         }
-        const data = await r.json();
-        sessionStorage.setItem('hs_access_token', data.access_token);
-        window.location.href = '/';
-      } catch (ex) {
-        err.textContent = 'Login failed: ' + ex.message;
-        err.hidden = false;
       }
-    });
+
+      toggleLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        setMode(mode === 'login' ? 'register' : 'login');
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        err.hidden = true;
+        submitBtn.disabled = true;
+        const path = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
+        try {
+          const r = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: fd.get('username'), password: fd.get('password') }),
+            credentials: 'include',
+          });
+          if (!r.ok) {
+            let msg = mode === 'register' ? 'Could not create account.' : 'Invalid credentials.';
+            try { const j = await r.json(); if (j && j.detail) msg = j.detail; } catch {}
+            err.textContent = msg;
+            err.hidden = false;
+            submitBtn.disabled = false;
+            return;
+          }
+          const data = await r.json();
+          sessionStorage.setItem('hs_access_token', data.access_token);
+          window.location.href = '/';
+        } catch (ex) {
+          err.textContent = (mode === 'register' ? 'Sign-up' : 'Login') + ' failed: ' + ex.message;
+          err.hidden = false;
+          submitBtn.disabled = false;
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     jwt_refresh_ttl_seconds: int = 7 * 24 * 3600
     admin_username: str = "admin"
     admin_password: str = "change-me-strong-password"
+    # Self-service account creation. On for dev/demo so visitors get their own
+    # login + profile; set ALLOW_REGISTRATION=false for a locked-down capture
+    # deployment where only the seeded admin should exist.
+    allow_registration: bool = True
 
     # ---- workers -------------------------------------------------------------
     worker_concurrency: int = 4
