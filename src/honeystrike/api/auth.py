@@ -169,6 +169,18 @@ async def current_user(                                   # pragma: no cover
     return user
 
 
+async def require_admin(                                  # pragma: no cover
+    user: Annotated[User, Depends(current_user)],
+) -> User:
+    """Dependency for Lead-only (admin) routes. 403 for members."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="this action requires a SOC Lead (admin) account",
+        )
+    return user
+
+
 # ---------------------------------------------------------------------------
 # Login + refresh routes
 # ---------------------------------------------------------------------------
@@ -191,6 +203,12 @@ class TokenOut(BaseModel):
 
 class AuthConfigOut(BaseModel):
     allow_registration: bool
+
+
+class MeOut(BaseModel):
+    username: str
+    role: str
+    is_admin: bool
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -224,6 +242,13 @@ def _issue_session(user: User, response: Response) -> TokenOut:
 async def auth_config() -> AuthConfigOut:
     """Public — lets the login page show/hide the 'create account' UI."""
     return AuthConfigOut(allow_registration=get_settings().allow_registration)
+
+
+@router.get("/me", response_model=MeOut)
+async def me(user: Annotated[User, Depends(current_user)]) -> MeOut:
+    """Current user's identity + role — the frontend uses this to render the
+    role badge and lock Lead-only actions."""
+    return MeOut(username=user.username, role=user.role, is_admin=user.role == "admin")
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
@@ -265,6 +290,7 @@ async def register(
     user = User(
         username=username,
         password_hash=hash_password(payload.password),
+        role="member",          # self-service signups are always Analysts
         is_active=True,
         last_login_at=datetime.now(UTC),
     )

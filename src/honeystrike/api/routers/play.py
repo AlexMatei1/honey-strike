@@ -25,7 +25,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from honeystrike.api.auth import current_user
+from honeystrike.api.auth import current_user, require_admin
 from honeystrike.cli.attack import campaigns as campaign_module
 from honeystrike.cli.attack import runners
 from honeystrike.core.models import User
@@ -217,7 +217,7 @@ async def list_scenarios(
 @router.post("/attack", response_model=TaskOut, status_code=202)
 async def launch_attack(
     body: AttackIn,
-    _user: Annotated[User, Depends(current_user)],
+    _user: Annotated[User, Depends(require_admin)],
 ) -> TaskOut:
     _gc_old_tasks()
     _enforce_rate_limit()
@@ -236,7 +236,7 @@ async def launch_attack(
 @router.post("/campaign", response_model=TaskOut, status_code=202)
 async def launch_campaign(
     body: CampaignIn,
-    _user: Annotated[User, Depends(current_user)],
+    _user: Annotated[User, Depends(require_admin)],
 ) -> TaskOut:
     _gc_old_tasks()
     _enforce_rate_limit()

@@ -50,6 +50,7 @@ async def _run() -> int:
                 pg_insert(User).values(
                     username=username,
                     password_hash=hashed,
+                    role="admin",
                     is_active=True,
                 )
             )
@@ -61,11 +62,13 @@ async def _run() -> int:
                     id=existing.id,
                     username=username,
                     password_hash=hashed,
+                    role="admin",
                     is_active=True,
                 )
                 .on_conflict_do_update(
                     index_elements=["id"],
-                    set_={"password_hash": hashed, "is_active": True},
+                    # Always (re)assert admin role + active for the seed account.
+                    set_={"password_hash": hashed, "role": "admin", "is_active": True},
                 )
             )
             log.info("bootstrap.admin_rotated", username=username)

@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from honeystrike.api import auth, stix, taxii, ws
 from honeystrike.api.routers import (
-    defender, health, lessons, play, profile, replay, sessions, stats,
+    admin, defender, health, lessons, play, profile, progress, replay, sessions, stats,
 )
 from honeystrike.config import get_settings
 from honeystrike.core.logging import configure_logging, get_logger
@@ -77,6 +77,8 @@ def create_app() -> FastAPI:
     app.include_router(replay.router)
     app.include_router(lessons.router)
     app.include_router(profile.router)
+    app.include_router(progress.router)
+    app.include_router(admin.router)
 
     # ---- Dashboard UI -----------------------------------------------------
     if _STATIC_DIR.is_dir():
@@ -175,6 +177,14 @@ def create_app() -> FastAPI:
         if templates is None:
             return HTMLResponse("<h1>HoneyStrike</h1>")
         return templates.TemplateResponse(request, "profile.html", {})
+
+    @app.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
+    async def dashboard_admin_users(request: Request) -> HTMLResponse:
+        # The page is rendered for everyone, but admin.js + the API enforce
+        # admin-only access (members see an access-denied notice).
+        if templates is None:
+            return HTMLResponse("<h1>HoneyStrike</h1>")
+        return templates.TemplateResponse(request, "admin_users.html", {})
 
     @app.get("/warroom", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_warroom(request: Request) -> HTMLResponse:

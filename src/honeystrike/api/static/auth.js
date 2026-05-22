@@ -46,6 +46,18 @@
     redirectToLogin();
   }
 
+  // Current user identity + role, fetched once and cached as a promise so
+  // every page script can `await window.HS.whoami()` without re-fetching.
+  let _mePromise = null;
+  function whoami() {
+    if (!_mePromise) {
+      _mePromise = apiFetch('/api/auth/me')
+        .then(r => (r.ok ? r.json() : null))
+        .catch(() => null);
+    }
+    return _mePromise;
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('logout-btn');
     if (btn) btn.addEventListener('click', logout);
@@ -55,5 +67,5 @@
   });
 
   // Expose the helpers as a tiny global namespace.
-  window.HS = { getToken, apiFetch, logout };
+  window.HS = { getToken, apiFetch, logout, whoami };
 })();

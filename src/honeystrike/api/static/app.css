@@ -1300,6 +1300,7 @@ tr.empty td { color: var(--muted); text-align: center; padding: 16px; }
   cursor: pointer;
   transition: background 0.15s, color 0.15s, transform 0.12s;
 }
+.dock-btn[hidden] { display: none; }   /* honour the hidden attr over display:flex */
 .dock-btn:hover { background: rgba(240, 192, 64, 0.1); color: var(--fg); transform: translateY(-3px); }
 .dock-btn.active {
   background: linear-gradient(180deg, var(--honey), var(--honey-lo));
@@ -1421,6 +1422,55 @@ tr.empty td { color: var(--muted); text-align: center; padding: 16px; }
 
 /* Active dock indicator override for our nav-active style */
 .topbar nav a.nav-active { color: var(--honey); }
+
+/* ============================================================
+   Roles — SOC Lead (admin) vs Analyst (member)
+   ============================================================ */
+.role-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+}
+.role-badge.role-admin {
+  background: linear-gradient(135deg, #3a2a0c, #4a3514);
+  border-color: var(--honey);
+  color: var(--honey-hi);
+}
+.role-badge.role-member {
+  background: var(--bg-elev-2);
+  border-color: var(--border-hi);
+  color: var(--term-green);
+}
+
+/* Lead-only actions locked for members: greyed, not-allowed, 🔒 marker. */
+.ui-locked {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  filter: grayscale(0.4);
+  position: relative;
+}
+.ui-locked:hover { transform: none !important; }
+.ui-locked .lock-i { font-size: 0.85em; }
+
+/* ---- Admin Users page ---- */
+.users-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.users-table th, .users-table td {
+  text-align: left; padding: 8px 10px;
+  border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.users-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.users-table .role-pill {
+  padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;
+}
+.users-table .role-pill.admin { background: #3a2a0c; color: var(--honey-hi); border: 1px solid var(--honey-lo); }
+.users-table .role-pill.member { background: var(--bg-elev-2); color: var(--term-green); border: 1px solid var(--border-hi); }
+.users-table .inactive { opacity: 0.5; }
+.users-table button { padding: 4px 10px; font-size: 0.8rem; }
+.users-denied { color: var(--critical); padding: 24px; text-align: center; }
 
 /* ============================================================
    Accessibility

@@ -307,10 +307,12 @@ Latency from "attacker sends bytes" to "session enriched + alert fired + UI upda
 ## Try it without deploying
 
 **▶ Live demo: https://honeystrike.icelegends.cloud** — **create your own
-account** on the login page (or use `admin` / `change-me-strong-password`) and
-click around (synthetic data; live capture ports are closed). Fire an attack
-from the command palette (⌘K), watch it land on the map, then open a typing
-lesson. Each account gets its own profile, XP, and badges.
+account** on the login page (you'll be an 🔍 **Analyst**) or use `admin` /
+`change-me-strong-password` (a 🛡 **SOC Lead**). Click around (synthetic data;
+live capture ports are closed), do a typing lesson, earn XP + badges. Leads
+can additionally fire live attacks, block IPs, and manage users; an Analyst
+sees those actions 🔒-locked with a one-line reason — the UI teaches the SOC
+role model. Each account's XP/badges are saved server-side and follow the login.
 
 > The demo may be asleep if the host is offline — the sections below stand up
 > your own copy in one command.

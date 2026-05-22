@@ -260,18 +260,59 @@ class Alert(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint("role IN ('admin','member')", name="ck_user_role"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
     username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'member'")
+    )
     is_active: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("TRUE")
     )
     last_login_at: Mapped[datetime | None] = mapped_column(_TS)
     created_at: Mapped[datetime] = mapped_column(
         _TS, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+
+
+class UserProgress(Base):
+    """Server-side gamification state, one row per user. Tracks XP, streaks,
+    earned badges, action counts, and a recent-activity log so progress
+    follows the account across devices."""
+
+    __tablename__ = "user_progress"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    xp: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    streak: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    best_streak: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    badges: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    counts: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    activity: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
     )
     updated_at: Mapped[datetime] = mapped_column(
         _TS, nullable=False, server_default=func.now()

@@ -56,7 +56,8 @@
           <input list="ttp-hints" name="ttp" placeholder="T1110.001"
                  autocomplete="off" spellcheck="false" maxlength="16" required>
           <button type="submit">Label</button>
-          <button type="button" class="block-btn" title="Block this source IP for 5 min">🚫 Block</button>
+          <button type="button" class="block-btn" data-admin-only="Blocking is a SOC Lead action"
+                  title="Block this source IP for 5 min">🚫 Block</button>
           <span class="label-result muted">—</span>
         </form>
       </div>
@@ -69,6 +70,8 @@
     card.querySelector('.block-btn').addEventListener('click', () => {
       manualBlock(msg.src_ip, card);
     });
+    // Lock the block button for Analysts (members) — labeling still works.
+    if (window.HSGame && window.HSGame.applyRoleLocks) window.HSGame.applyRoleLocks(card);
     return card;
   }
 

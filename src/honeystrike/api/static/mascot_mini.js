@@ -5,11 +5,7 @@
 // trigger the mascot to react.
 
 (function () {
-  const LS_XP        = 'hs_xp_v1';
-  const LS_STREAK    = 'hs_streak_v1';
-  const LS_COUNTS    = 'hs_counts_v1';
-  const LS_ACTIVITY  = 'hs_activity_v1';
-  const LS_BRIEF_PFX = 'hs_briefed_';      // + page key
+  const LS_BRIEF_PFX = 'hs_briefed_';      // + page key (UI hint state, fine in localStorage)
 
   // ---- page registry ---------------------------------------------------
   // What page we're on is inferred from window.location.pathname so a
@@ -117,71 +113,58 @@
     return ['unknown', null];
   }
 
-  // ---- XP state --------------------------------------------------------
-  function getXp()     { return Number(localStorage.getItem(LS_XP) || 0); }
-  function getStreak() { return Number(localStorage.getItem(LS_STREAK) || 0); }
+  // ---- XP / progress (server-backed) -----------------------------------
+  // Progress now lives in the database, keyed to the account. We render the
+  // topbar XP badge from /api/progress and bump it by POSTing actions.
+  let _progress = null;
 
-  function setXp(n) {
-    localStorage.setItem(LS_XP, String(n));
-    const el = document.getElementById('xp-value');
-    if (el) el.textContent = String(n);
-  }
-  function setStreak(n) {
-    localStorage.setItem(LS_STREAK, String(n));
-    const el = document.getElementById('xp-streak-value');
+  function renderXp(p) {
+    if (!p) return;
+    const xpEl = document.getElementById('xp-value');
+    if (xpEl) xpEl.textContent = String(p.xp ?? 0);
+    const sEl = document.getElementById('xp-streak-value');
     const wrap = document.getElementById('xp-streak');
-    if (el) el.textContent = String(n);
-    if (wrap) wrap.hidden = n <= 0;
+    const streak = p.streak ?? 0;
+    if (sEl) sEl.textContent = String(streak);
+    if (wrap) wrap.hidden = streak <= 0;
   }
 
-  function bumpXp(delta, reason) {
-    const next = Math.max(0, getXp() + delta);
-    setXp(next);
-    const bubble = document.getElementById('xp-badge');
-    if (bubble) {
-      bubble.classList.remove('xp-flash');
-      void bubble.offsetWidth;   // restart animation
-      bubble.classList.add('xp-flash');
-    }
-    popMascot(delta > 0 ? 'cheer' : 'shock',
-              delta > 0 ? `+${delta} XP — ${reason || 'nice'}` : `${delta} XP — ${reason || 'oops'}`);
+  function flashXpBadge() {
+    const b = document.getElementById('xp-badge');
+    if (!b) return;
+    b.classList.remove('xp-flash');
+    void b.offsetWidth;
+    b.classList.add('xp-flash');
   }
-  function bumpStreak(delta) {
-    const next = Math.max(0, getStreak() + delta);
-    setStreak(next);
-    if (delta > 0) {
-      const c = readCounts();
-      c.bestStreak = Math.max(c.bestStreak || 0, next);
-      writeCounts(c);
-    }
-  }
-  function resetStreak() { setStreak(0); }
 
-  // ---- counters + activity log (for profile + badges) ------------------
-  function readCounts() {
-    try { return JSON.parse(localStorage.getItem(LS_COUNTS) || '{}'); }
-    catch { return {}; }
+  async function loadProgress() {
+    try {
+      const r = await window.HS.apiFetch('/api/progress');
+      if (r.ok) { _progress = await r.json(); renderXp(_progress); }
+    } catch (_) { /* ignore */ }
   }
-  function writeCounts(c) { localStorage.setItem(LS_COUNTS, JSON.stringify(c)); }
-  function bumpCount(key, delta = 1) {
-    const c = readCounts();
-    c[key] = (c[key] || 0) + delta;
-    writeCounts(c);
-  }
-  function addDoneLesson(family, id) {
-    const c = readCounts();
-    const set = new Set(c.lessonsDoneIds || []);
-    set.add(`${family}:${id}`);
-    c.lessonsDoneIds = [...set];
-    c.lessonsDone = set.size;
-    writeCounts(c);
-  }
-  function logActivity(icon, text) {
-    let arr = [];
-    try { arr = JSON.parse(localStorage.getItem(LS_ACTIVITY) || '[]'); } catch {}
-    arr.unshift({ t: new Date().toISOString(), icon, text });
-    arr = arr.slice(0, 50);
-    localStorage.setItem(LS_ACTIVITY, JSON.stringify(arr));
+
+  // POST one action; the server applies XP/streak/badge rules and returns the
+  // updated progress. We render it and react with the mascot.
+  async function postEvent(action, meta, opts = {}) {
+    try {
+      const r = await window.HS.apiFetch('/api/progress/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, meta: meta || null }),
+      });
+      if (!r.ok) return null;
+      const p = await r.json();
+      _progress = p;
+      renderXp(p);
+      flashXpBadge();
+      let msg = opts.message || '';
+      if (p.newly_earned && p.newly_earned.length) {
+        msg += (msg ? '  ' : '') + `🏅 ${p.newly_earned.length} new badge${p.newly_earned.length > 1 ? 's' : ''}!`;
+      }
+      popMascot(opts.bad ? 'shock' : 'cheer', msg || (opts.bad ? 'oops' : 'nice'));
+      return p;
+    } catch (_) { return null; }
   }
 
   // ---- mini-mascot reactions ------------------------------------------
@@ -317,51 +300,77 @@
     if (dockBtn) dockBtn.classList.add('active');
   }
 
+  // ---- role + Lead-only locks -----------------------------------------
+  let _isAdmin = false;
+
+  function lockClickGuard(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    popMascot('shock', '🔒 Operator action — ask a SOC Lead (admin).');
+  }
+
+  // Disable any element marked `data-admin-only="reason"` for members,
+  // adding a 🔒 + tooltip. Re-runnable for dynamically-added content.
+  function applyRoleLocks(root) {
+    if (_isAdmin) return;
+    (root || document).querySelectorAll('[data-admin-only]').forEach((el) => {
+      if (el.dataset.locked === '1') return;
+      el.dataset.locked = '1';
+      el.classList.add('ui-locked');
+      el.setAttribute('aria-disabled', 'true');
+      el.title = '🔒 ' + (el.getAttribute('data-admin-only') || 'Requires a SOC Lead (admin)');
+      el.addEventListener('click', lockClickGuard, true);
+      if (el.dataset.lockMark !== 'off' && !el.querySelector('.lock-i')) {
+        const i = document.createElement('span');
+        i.className = 'lock-i';
+        i.textContent = ' 🔒';
+        el.appendChild(i);
+      }
+    });
+  }
+
+  async function initRole() {
+    let me = null;
+    try { me = await window.HS.whoami(); } catch (_) { /* ignore */ }
+    if (!me) return;
+    _isAdmin = !!me.is_admin;
+    const badge = document.getElementById('role-badge');
+    if (badge) {
+      badge.textContent = me.is_admin ? '🛡 SOC Lead' : '🔍 Analyst';
+      badge.className = 'role-badge ' + (me.is_admin ? 'role-admin' : 'role-member');
+      badge.hidden = false;
+    }
+    if (me.is_admin) {
+      const d = document.getElementById('dock-admin');
+      if (d) d.hidden = false;
+    }
+    applyRoleLocks(document);
+  }
+
   // ---- public API for other page scripts ------------------------------
   window.HSGame = {
-    bumpXp,
-    bumpStreak,
-    resetStreak,
     react: popMascot,                 // (state, text, ttl?)
     flash: (text) => popMascot('happy', text),
     woops: (text) => popMascot('shock', text),
-    onCanaryFound: () => {
-      bumpXp(5, 'canary caught');
-      bumpCount('canariesCaught');
-      logActivity('🚩', 'Caught a canary in an attacker session.');
-    },
-    onLessonComplete: (family, id) => {
-      bumpXp(15, 'lesson complete');
-      if (family && id) addDoneLesson(family, id);
-      else bumpCount('lessonsDone');
-      logActivity('🎓', `Completed ${family || 'a'} lesson ${id ? '"' + id + '"' : ''}`.trim());
-    },
-    onCorrectLabel: () => {
-      bumpXp(10, 'correct label'); bumpStreak(1);
-      bumpCount('correctLabels');
-      logActivity('✓', 'Correctly labelled / graded a TTP.');
-    },
-    onWrongLabel: () => {
-      bumpXp(-2, 'wrong label'); resetStreak();
-      bumpCount('wrongLabels');
-      logActivity('✗', 'Wrong label — streak reset.');
-    },
-    onBlock: () => {
-      bumpXp(3, 'attacker blocked');
-      bumpCount('blocks');
-      logActivity('🚫', 'Blocked an attacker IP.');
-    },
+    isAdmin: () => _isAdmin,
+    applyRoleLocks,
+    refreshProgress: loadProgress,
+    onCanaryFound:    () => postEvent('canary_found', null, { message: '+5 XP — canary caught' }),
+    onLessonComplete: (family, id) => postEvent('lesson_complete', { family, id }, { message: '+15 XP — lesson complete' }),
+    onCorrectLabel:   () => postEvent('correct_label', null, { message: '+10 XP — correct!' }),
+    onWrongLabel:     () => postEvent('wrong_label', null, { bad: true, message: '−2 XP — streak reset' }),
+    onBlock:          () => postEvent('block', null, { message: '+3 XP — attacker blocked' }),
   };
 
   document.addEventListener('DOMContentLoaded', () => {
     paintActiveNav();
-    setXp(getXp());
-    setStreak(getStreak());
+    if (window.HS && window.HS.getToken()) {
+      loadProgress();
+      initRole();
+    }
     const [key, def] = currentPage();
     if (def) {
-      // Idle tip text.
       if (bubbleText) bubbleText.textContent = def.tip;
-      // First-visit briefing.
       if (!wasBriefed(key)) {
         setTimeout(() => { showBriefing(def); markBriefed(key); }, 400);
       }

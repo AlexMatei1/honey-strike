@@ -94,6 +94,9 @@
     const result = document.getElementById('block-result');
     if (!btn || !srcIp) return;
     btn.hidden = false;
+    // The button reveals after data loads (post-initRole), so re-apply the
+    // Lead-only lock now that it's visible.
+    if (window.HSGame && window.HSGame.applyRoleLocks) window.HSGame.applyRoleLocks(document);
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       result.textContent = 'Blocking…';

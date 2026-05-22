@@ -1,0 +1,31 @@
+{% extends "_base.html" %}
+{% set hide_mini_mascot = True %}
+{% block title %}Users — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="admin-page">
+    <header class="page-header">
+      <h1>🛡 Operator accounts</h1>
+      <span class="muted">SOC Leads can promote, demote, and deactivate accounts.</span>
+    </header>
+
+    <div id="users-denied" class="users-denied" hidden>
+      🔒 This page is for SOC Leads (admins) only. Ask a Lead to promote your
+      account, or <a href="/">go back to the dashboard</a>.
+    </div>
+
+    <div id="users-wrap" hidden>
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>User</th><th>Role</th><th>Rank</th><th>XP</th>
+            <th>Status</th><th>Joined</th><th>Last seen</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/admin_users.js"></script>
+{% endblock %}

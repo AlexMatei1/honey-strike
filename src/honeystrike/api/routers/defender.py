@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from honeystrike.api.auth import current_user, get_db
+from honeystrike.api.auth import current_user, get_db, require_admin
 from honeystrike.config import get_settings
 from honeystrike.core import blocklist
 from honeystrike.core.models import Session, TTPMatch, User
@@ -64,9 +64,10 @@ async def label_session(
     db: Annotated[AsyncSession, Depends(get_db)],
     _user: Annotated[User, Depends(current_user)],
 ) -> LabelOut:
-    """Label the TTP an attacker exhibited. If the label matches a real
-    `ttp_matches.technique_id` on that session, optionally block the
-    source IP for `ttl_seconds`."""
+    """Label the TTP an attacker exhibited. Analysts (members) can label to
+    learn, but only SOC Leads (admins) trigger the block side-effect — for a
+    member the block is silently skipped (they still get correct/incorrect
+    feedback)."""
     sess = (
         (await db.execute(select(Session).where(Session.id == body.session_id)))
         .scalars().first()
@@ -85,7 +86,8 @@ async def label_session(
 
     blocked_ip: str | None = None
     ttl_used: int | None = None
-    if correct and body.block:
+    may_block = _user.role == "admin"
+    if correct and body.block and may_block:
         # Sessions.src_ip is Postgres inet ("1.2.3.4/32"); listeners see the
         # bare host string, so normalise before writing the blocklist key.
         ip_to_block = _sanitise_ip(str(sess.src_ip))
@@ -113,7 +115,7 @@ async def label_session(
 @router.post("/block", response_model=BlockOut)
 async def block_ip(
     body: BlockIn,
-    _user: Annotated[User, Depends(current_user)],
+    _user: Annotated[User, Depends(require_admin)],
 ) -> BlockOut:
     """Manually add an IP to the block list. Used by `defend label --block` and
     can also be invoked by the operator for ad-hoc blocking."""
@@ -139,7 +141,7 @@ async def block_ip(
 @router.delete("/block/{ip}")
 async def unblock_ip(
     ip: str,
-    _user: Annotated[User, Depends(current_user)],
+    _user: Annotated[User, Depends(require_admin)],
 ) -> dict[str, Any]:
     client = _redis_client()
     try:

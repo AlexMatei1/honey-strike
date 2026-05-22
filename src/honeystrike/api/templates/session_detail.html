@@ -6,7 +6,8 @@
     <h1>Session <code id="session-id">{{ session_id }}</code></h1>
     <div class="detail-actions">
       <a class="action-btn" href="/sessions/{{ session_id }}/replay">🎬 Replay session</a>
-      <button id="block-src-btn" class="action-btn danger" type="button" hidden>🚫 Block source IP (5 min)</button>
+      <button id="block-src-btn" class="action-btn danger" type="button" hidden
+              data-admin-only="Blocking an IP is a SOC Lead action">🚫 Block source IP (5 min)</button>
       <span id="block-result" class="muted"></span>
     </div>
     <div id="detail-status" class="muted">Loading…</div>
