@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from argon2 import PasswordHasher
@@ -33,7 +33,9 @@ from honeystrike.core.models import User
 
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
+RESET_TOKEN_TYPE = "reset"
 REFRESH_COOKIE_NAME = "hs_refresh"
+RESET_TOKEN_TTL_SECONDS = 3600          # one-time reset links live 1 hour
 
 _hasher = PasswordHasher()
 _bearer = HTTPBearer(auto_error=False)
@@ -298,6 +300,48 @@ async def register(
     await db.commit()
     await db.refresh(user)
     return _issue_session(user, response)
+
+
+class ResetIn(BaseModel):
+    token: str
+    new_password: str
+
+
+def issue_reset_token(username: str) -> str:
+    """Sign a one-time password-reset token for `username`."""
+    return issue_token(
+        subject=username, token_type=RESET_TOKEN_TYPE,
+        ttl_seconds=RESET_TOKEN_TTL_SECONDS,
+    )
+
+
+@router.post("/reset")
+async def reset_password(
+    payload: ResetIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Set a new password from a valid reset token (public — the token is the
+    proof). Tokens are short-lived and signed; an expired/invalid one is 401."""
+    claims = decode_token(payload.token, expected_type=RESET_TOKEN_TYPE)
+    username = claims.get("sub")
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+    # Reuse the registration password rule (length bounds).
+    err = validate_registration("placeholder", payload.new_password)
+    if err and "password" in err:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=err)
+    user = (
+        await db.execute(select(User).where(User.username == username))
+    ).scalars().first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+    await db.execute(
+        update(User).where(User.id == user.id).values(
+            password_hash=hash_password(payload.new_password)
+        )
+    )
+    await db.commit()
+    return {"ok": True, "username": username}
 
 
 @router.post("/login", response_model=TokenOut)           # pragma: no cover

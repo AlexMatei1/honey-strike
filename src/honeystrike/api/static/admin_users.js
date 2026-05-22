@@ -46,6 +46,7 @@
         <td>
           <button type="button" data-act="role" data-id="${u.id}" data-to="${toRole}">${roleBtn}</button>
           <button type="button" data-act="active" data-id="${u.id}" data-to="${u.is_active ? 'false' : 'true'}">${actBtn}</button>
+          <button type="button" data-act="reset" data-id="${u.id}" data-user="${esc(u.username)}">Reset pw</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -59,6 +60,18 @@
     const id = btn.dataset.id;
     btn.disabled = true;
     try {
+      if (btn.dataset.act === 'reset') {
+        const r = await window.HS.apiFetch(`/api/admin/users/${id}/reset-link`, { method: 'POST' });
+        btn.disabled = false;
+        if (!r.ok) { if (window.HSGame) window.HSGame.woops(`HTTP ${r.status}`); return; }
+        const out = await r.json();
+        // Show the one-time link for the Lead to hand to the member.
+        window.prompt(
+          `One-time reset link for ${out.username} (valid 1h). Copy + send it to them:`,
+          out.reset_url,
+        );
+        return;
+      }
       let r;
       if (btn.dataset.act === 'role') {
         r = await window.HS.apiFetch(`/api/admin/users/${id}/role`, {

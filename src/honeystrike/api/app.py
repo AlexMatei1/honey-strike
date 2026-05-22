@@ -107,6 +107,12 @@ def create_app() -> FastAPI:
             return HTMLResponse("<h1>HoneyStrike</h1><p>UI templates not packaged.</p>")
         return templates.TemplateResponse(request, "login.html", {})
 
+    @app.get("/reset", response_class=HTMLResponse, include_in_schema=False)
+    async def dashboard_reset(request: Request) -> HTMLResponse:
+        if templates is None:
+            return HTMLResponse("<h1>HoneyStrike</h1>")
+        return templates.TemplateResponse(request, "reset.html", {})
+
     @app.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_sessions(request: Request) -> HTMLResponse:
         if templates is None:

@@ -18,7 +18,9 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from honeystrike.api.auth import get_db, require_admin
+from fastapi import Request
+
+from honeystrike.api.auth import get_db, issue_reset_token, require_admin
 from honeystrike.core import progression
 from honeystrike.core.models import User, UserProgress
 
@@ -95,6 +97,26 @@ async def set_role(
     user.role = body.role
     await db.commit()
     return {"ok": True, "id": str(user.id), "role": user.role}
+
+
+@router.post("/users/{user_id}/reset-link")
+async def make_reset_link(
+    user_id: uuid.UUID,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+) -> dict[str, Any]:
+    """Generate a one-time password-reset link for a user. Works with zero
+    email infra — the Lead hands the link to the member out-of-band."""
+    user = await _load(db, user_id)
+    token = issue_reset_token(user.username)
+    base = str(request.base_url).rstrip("/")
+    return {
+        "ok": True,
+        "username": user.username,
+        "reset_url": f"{base}/reset?token={token}",
+        "expires_in": 3600,
+    }
 
 
 @router.post("/users/{user_id}/active")

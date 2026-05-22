@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset password — HoneyStrike</title>
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='52' font-size='52'>🐝</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-body">
+  <form id="reset-form" class="login-card" autocomplete="off">
+    <h1>🐝 Reset password</h1>
+    <p class="muted">Choose a new password for your account.</p>
+    <label>New password
+      <input type="password" name="new_password" required autofocus minlength="8">
+    </label>
+    <label>Confirm password
+      <input type="password" name="confirm" required minlength="8">
+    </label>
+    <button type="submit" id="reset-submit">Set new password</button>
+    <p id="reset-msg" hidden></p>
+    <p class="auth-toggle muted"><a href="/login">← back to sign in</a></p>
+  </form>
+  <script>
+    (function () {
+      const form = document.getElementById('reset-form');
+      const msg = document.getElementById('reset-msg');
+      const btn = document.getElementById('reset-submit');
+      const token = new URLSearchParams(window.location.search).get('token');
+
+      if (!token) {
+        msg.textContent = 'Missing or invalid reset link. Ask a SOC Lead for a new one.';
+        msg.className = 'error';
+        msg.hidden = false;
+        btn.disabled = true;
+        return;
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        msg.hidden = true;
+        if (fd.get('new_password') !== fd.get('confirm')) {
+          msg.textContent = 'Passwords do not match.';
+          msg.className = 'error'; msg.hidden = false;
+          return;
+        }
+        btn.disabled = true;
+        try {
+          const r = await fetch('/api/auth/reset', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, new_password: fd.get('new_password') }),
+          });
+          if (!r.ok) {
+            let m = r.status === 401 ? 'This reset link is invalid or has expired.' : 'Reset failed.';
+            try { const j = await r.json(); if (j && j.detail) m = j.detail; } catch {}
+            msg.textContent = m; msg.className = 'error'; msg.hidden = false;
+            btn.disabled = false;
+            return;
+          }
+          msg.textContent = '✓ Password updated. Redirecting to sign in…';
+          msg.className = 'ok'; msg.hidden = false;
+          setTimeout(() => { window.location.href = '/login'; }, 1400);
+        } catch (ex) {
+          msg.textContent = 'Reset failed: ' + ex.message;
+          msg.className = 'error'; msg.hidden = false;
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
