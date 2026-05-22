@@ -57,7 +57,7 @@ def validate_registration(username: str, password: str) -> str | None:
 
 # Simple in-process sliding-window limiter for account creation, so an open
 # demo can't be flooded with sign-ups. Resets when the API restarts.
-_REGISTER_MAX_PER_WINDOW = 10
+_REGISTER_MAX_PER_WINDOW = 20
 _REGISTER_WINDOW_SECONDS = 300.0
 _register_times: list[float] = []
 

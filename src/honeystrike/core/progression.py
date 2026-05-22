@@ -18,6 +18,8 @@ XP_DELTAS: dict[str, int] = {
     "wrong_label": -2,
     "canary_found": 5,
     "block": 3,
+    "duel_played": 10,
+    "duel_win": 25,
 }
 
 # (min_xp, name) ascending. rank_for() returns current + next.
@@ -97,6 +99,12 @@ BADGES: list[dict[str, Any]] = [
     {"id": "flag-hunter", "icon": "🚩", "name": "Flag Hunter",
      "desc": "Caught a canary in an attacker session.",
      "check": lambda c: c["counts"].get("canariesCaught", 0) >= 1},
+    {"id": "duelist", "icon": "⚔️", "name": "Duelist",
+     "desc": "Played your first member-vs-member duel.",
+     "check": lambda c: c["counts"].get("duelsPlayed", 0) >= 1},
+    {"id": "champion", "icon": "🏆", "name": "Champion",
+     "desc": "Win 5 duels.",
+     "check": lambda c: c["counts"].get("duelsWon", 0) >= 5},
 ]
 
 
@@ -137,6 +145,15 @@ def apply_event(progress: dict[str, Any], action: str, meta: dict[str, Any] | No
     elif action == "block":
         counts["blocks"] = counts.get("blocks", 0) + 1
         icon, text = "🚫", "Blocked an attacker IP."
+    elif action == "duel_played":
+        counts["duelsPlayed"] = counts.get("duelsPlayed", 0) + 1
+        won = bool(meta.get("won"))
+        opp = meta.get("opponent") or "an opponent"
+        icon = "🏆" if won else "🤝"
+        text = f"{'Won' if won else 'Played'} a duel vs {opp}."
+    elif action == "duel_win":
+        counts["duelsWon"] = counts.get("duelsWon", 0) + 1
+        icon, text = "🏆", f"Won a duel vs {meta.get('opponent') or 'an opponent'}."
 
     activity: list = progress.setdefault("activity", [])
     activity.insert(0, {"t": _now_iso(), "icon": icon, "text": text})

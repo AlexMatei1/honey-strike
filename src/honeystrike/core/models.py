@@ -317,3 +317,43 @@ class UserProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(
         _TS, nullable=False, server_default=func.now()
     )
+
+
+class Duel(Base):
+    """A member-vs-member consensual PvP match. The attacker fires scenario
+    'waves'; the defender labels each to block it. Wave state is JSONB."""
+
+    __tablename__ = "duels"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','active','declined','finished','expired')",
+            name="ck_duel_status",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    attacker_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    defender_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'pending'")
+    )
+    duration_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("300")
+    )
+    attacker_score: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    defender_score: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    waves: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        _TS, nullable=False, server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(_TS)
+    ends_at: Mapped[datetime | None] = mapped_column(_TS)
+    finished_at: Mapped[datetime | None] = mapped_column(_TS)

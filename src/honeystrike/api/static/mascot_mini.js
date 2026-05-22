@@ -86,7 +86,14 @@
       match: (p) => p === '/play',
       title: '🎮  Welcome to Play',
       tip:   "Attack or Defend.  Pick a side.",
-      briefing: `<p>Two paths.  <a href="/play/attack">🗡 Attack</a> teaches you to write attacks.  <a href="/play/defend">🛡 Defend</a> teaches you to detect them.  Same data, different chair.</p>`,
+      briefing: `<p>Two paths.  <a href="/play/attack">🗡 Attack</a> teaches you to write attacks.  <a href="/play/defend">🛡 Defend</a> teaches you to detect them.  Same data, different chair.  Or <a href="/play/duel">⚔️ Duel</a> another member head-to-head.</p>`,
+      tour: [],
+    },
+    duel: {
+      match: (p) => p === '/play/duel',
+      title: '⚔️  Duel arena',
+      tip:   "Challenge a member. Attacker fires waves; defender labels them in time.",
+      briefing: `<p>Member-vs-member PvP.  Challenge someone → they accept → a timed match starts.  The <strong>attacker</strong> fires scenario waves; the <strong>defender</strong> must label each wave's MITRE technique before the clock runs out.  Each blocked wave = 10 pts to the defender; each one that gets through = 10 pts to the attacker.  Winner takes the XP.  Firing is unlocked for both roles <em>inside</em> an accepted duel.</p>`,
       tour: [],
     },
     profile: {
@@ -292,6 +299,7 @@
     let key = 'dashboard';
     if (p === '/sessions' || p.startsWith('/sessions/')) key = 'sessions';
     else if (p === '/analytics') key = 'analytics';
+    else if (p === '/play/duel') key = 'duel';
     else if (p.startsWith('/play')) key = 'play';
     else if (p === '/warroom') key = 'warroom';
     else if (p === '/profile') key = 'profile';

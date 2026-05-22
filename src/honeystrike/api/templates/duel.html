@@ -1,0 +1,53 @@
+{% extends "_base.html" %}
+{% block title %}Duel — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="duel-page">
+    <header class="page-header">
+      <h1>⚔️ Duel arena</h1>
+      <a class="muted" href="/play">&larr; back to Play</a>
+    </header>
+
+    <p class="muted">Challenge another member to a timed attack/defend match. The
+      attacker fires scenario waves; the defender races to label each one's MITRE
+      technique before time runs out. Winner takes the XP.</p>
+
+    {# Active / pending duel arena (filled by JS) #}
+    <section id="duel-arena" hidden></section>
+
+    <div class="duel-grid">
+      <div class="duel-pane">
+        <h2>🥊 Challenge a player</h2>
+        <form id="challenge-form" class="duel-challenge">
+          <label>Opponent
+            <select id="opponent" required></select>
+          </label>
+          <label>Duration
+            <select id="duration">
+              <option value="120">2 min</option>
+              <option value="300" selected>5 min</option>
+              <option value="600">10 min</option>
+            </select>
+          </label>
+          <button type="submit">Send challenge</button>
+        </form>
+        <p id="challenge-msg" class="muted"></p>
+      </div>
+
+      <div class="duel-pane">
+        <h2>📥 Incoming challenges</h2>
+        <ul id="duel-inbox"><li class="muted">none right now</li></ul>
+      </div>
+    </div>
+
+    <section class="duel-pane">
+      <h2>🏆 Duel leaderboard</h2>
+      <table class="users-table">
+        <thead><tr><th>Player</th><th>Won</th><th>Played</th><th>XP</th></tr></thead>
+        <tbody id="duel-leaderboard"><tr><td colspan="4" class="muted">No duels played yet.</td></tr></tbody>
+      </table>
+    </section>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/duel.js"></script>
+{% endblock %}
