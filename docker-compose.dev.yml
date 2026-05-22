@@ -352,6 +352,28 @@ services:
       - honeypot-net
       - internal-net
 
+  # ---------------------------------------------------------------------------
+  # Cloudflare tunnel (optional) — publishes the dashboard at a public
+  # hostname with no inbound ports opened. Opt-in via the `tunnel` profile:
+  #
+  #   docker compose -f docker-compose.dev.yml --profile tunnel up -d cloudflared
+  #
+  # Needs CLOUDFLARE_TUNNEL_TOKEN in .env (gitignored). The tunnel's ingress
+  # (hostname → http://dashboard-api:8000) is configured remotely in Cloudflare,
+  # so nothing instance-specific is committed. Routes container-to-container to
+  # the dashboard over internal-net.
+  # ---------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: honeystrike-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN:-}"]
+    depends_on:
+      - dashboard-api
+    networks:
+      - internal-net
+
 volumes:
   postgres_data:
   redis_data:
