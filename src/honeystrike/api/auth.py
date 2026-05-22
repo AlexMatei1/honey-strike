@@ -387,6 +387,64 @@ async def resend_verification(
     return {"ok": True}
 
 
+class ForgotIn(BaseModel):
+    identifier: str          # username or email
+
+
+_forgot_times: list[float] = []
+_FORGOT_MAX_PER_WINDOW = 10
+_FORGOT_WINDOW_SECONDS = 300.0
+
+
+def _forgot_rate_limit() -> None:
+    now = time.time()
+    _forgot_times[:] = [t for t in _forgot_times if t > now - _FORGOT_WINDOW_SECONDS]
+    if len(_forgot_times) >= _FORGOT_MAX_PER_WINDOW:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="too many reset requests; try again later")
+    _forgot_times.append(now)
+
+
+_GENERIC_FORGOT = {
+    "ok": True,
+    "message": "If an account with email matches, a reset link has been sent.",
+}
+
+
+@router.post("/forgot")
+async def forgot_password(
+    payload: ForgotIn,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    """Self-service password reset. Looks up by username OR email; if a match
+    has an email on file, sends a reset link. Always returns the same generic
+    response (never reveals whether an account exists, never returns the token)."""
+    _forgot_rate_limit()
+    ident = (payload.identifier or "").strip()
+    if ident:
+        user = (
+            await db.execute(
+                select(User).where(
+                    User.is_active.is_(True),
+                    (func.lower(User.username) == ident.lower())
+                    | (func.lower(User.email) == ident.lower()),
+                )
+            )
+        ).scalars().first()
+        if user is not None and user.email:
+            from honeystrike.core.mailer import send_email
+            link = f"{str(request.base_url).rstrip('/')}/reset?token={issue_reset_token(user.username)}"
+            await send_email(
+                to=user.email,
+                subject="Reset your HoneyStrike password",
+                body=f"Someone requested a password reset for {user.username}.\n\n"
+                     f"If this was you, open this link (valid 1h):\n{link}\n\n"
+                     f"If not, you can ignore this email.\n",
+            )
+    return _GENERIC_FORGOT
+
+
 class ResetIn(BaseModel):
     token: str
     new_password: str

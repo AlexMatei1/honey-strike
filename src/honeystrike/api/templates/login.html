@@ -30,6 +30,21 @@
       <span id="toggle-text">New here?</span>
       <a href="#" id="toggle-link">Create an account</a>
     </p>
+    <p class="auth-toggle muted" id="forgot-row">
+      <a href="#" id="forgot-link">Forgot password?</a>
+    </p>
+  </form>
+
+  <form id="forgot-form" class="login-card" autocomplete="off" hidden>
+    <h1>🐝 Reset password</h1>
+    <p class="muted">Enter your username or email. If a matching account has an
+      email on file, we'll send a reset link.</p>
+    <label>Username or email
+      <input type="text" name="identifier" required>
+    </label>
+    <button type="submit" id="forgot-submit">Send reset link</button>
+    <p id="forgot-msg" hidden></p>
+    <p class="auth-toggle muted"><a href="#" id="forgot-back">← back to sign in</a></p>
   </form>
   <script>
     (function () {
@@ -68,6 +83,41 @@
       toggleLink.addEventListener('click', (e) => {
         e.preventDefault();
         setMode(mode === 'login' ? 'register' : 'login');
+      });
+
+      // Forgot-password: swap to the reset-request card.
+      const forgotForm = document.getElementById('forgot-form');
+      const forgotMsg = document.getElementById('forgot-msg');
+      document.getElementById('forgot-link').addEventListener('click', (e) => {
+        e.preventDefault();
+        form.hidden = true;
+        forgotForm.hidden = false;
+      });
+      document.getElementById('forgot-back').addEventListener('click', (e) => {
+        e.preventDefault();
+        forgotForm.hidden = true;
+        form.hidden = false;
+      });
+      forgotForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = new FormData(forgotForm).get('identifier');
+        const btn = document.getElementById('forgot-submit');
+        btn.disabled = true;
+        forgotMsg.hidden = true;
+        try {
+          const r = await fetch('/api/auth/forgot', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: id }),
+          });
+          const j = await r.json().catch(() => ({}));
+          forgotMsg.textContent = j.message || 'If an account matches, a reset link has been sent.';
+          forgotMsg.className = 'ok';
+        } catch (ex) {
+          forgotMsg.textContent = 'Request failed: ' + ex.message;
+          forgotMsg.className = 'error';
+        }
+        forgotMsg.hidden = false;
+        btn.disabled = false;
       });
 
       form.addEventListener('submit', async (e) => {
