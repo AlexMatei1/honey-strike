@@ -6,6 +6,7 @@
 
 Capture real attackers across **SSH / HTTP / FTP / RDP / TLS / Telnet / SMTP / Redis**, enrich every session with **geo-IP + abuse reputation + tool fingerprint + MITRE ATT&CK attribution + threat score**, send alerts, render PDF reports, and let your operators **learn to attack and defend by typing real code** — all in one `docker compose up -d`.
 
+[![Live demo](https://img.shields.io/badge/live%20demo-honeystrike.icelegends.cloud-f0c040?style=flat-square&logo=cloudflare&logoColor=white)](https://honeystrike.icelegends.cloud)
 [![CI](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexMatei1/honey-strike/actions/workflows/ci.yml)
 ![status](https://img.shields.io/badge/status-v1.0%20shipped-success?style=flat-square)
 ![python](https://img.shields.io/badge/python-3.13-blue?style=flat-square)
@@ -305,8 +306,16 @@ Latency from "attacker sends bytes" to "session enriched + alert fired + UI upda
 
 ## Try it without deploying
 
-Want to click around first? Stand up a **read-only demo** (dashboard + synthetic
-data, no live capture ports) in one command — or one click on Render/Fly. See
+**▶ Live demo: https://honeystrike.icelegends.cloud** — log in with `admin` /
+`change-me-strong-password` and click around (synthetic data; live capture
+ports are closed). Fire an attack from the command palette (⌘K), watch it land
+on the map, then open a typing lesson.
+
+> The demo may be asleep if the host is offline — the sections below stand up
+> your own copy in one command.
+
+Want your own? Stand up a **read-only demo** (dashboard + synthetic data, no
+live capture ports) in one command — or one click on Render/Fly. See
 [`DEMO_DEPLOY.md`](DEMO_DEPLOY.md).
 
 ```bash
