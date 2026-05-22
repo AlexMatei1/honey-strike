@@ -103,11 +103,15 @@ The result is one repo that works as a production honeypot, a SOC training platf
 - **Command palette (⌘K)** to jump anywhere, fire any scenario, open any session
 - **Honey-warm + cyber-terminal theme** with a floating dock, honeycomb hex background, live threat-level viewport border
 
-### 🤝 Multiplayer
-- **Lobby service** (FastAPI + SQLite, separate container) brokers invites
-- `honeystrike challenge bob --scenario apt28` from one VPS to another
-- Defender labels TTPs live; correct labels block the attacker's IP for 5 min
-- Match summary posts to a shared Discord webhook
+### 🤝 Multiplayer & PvP
+- **In-app duels** — challenge another member to a timed 1-v-1; attacker fires
+  scenario waves, defender labels each to block it, winner takes XP (`/play/duel`)
+- **Open PvP arena** — a Lead opens a window; anyone fires, everyone races to
+  label the shared feed; live scoreboard (`/play/arena`)
+- **Cross-instance lobby** (FastAPI + SQLite) — `honeystrike challenge bob` from
+  one VPS to another; correct labels block the attacker's IP; Discord summary
+- **Accounts & roles** — self-service sign-up, 🛡 SOC Lead vs 🔍 Analyst, email
+  verification, admin + self-service password reset
 
 </td>
 </tr>

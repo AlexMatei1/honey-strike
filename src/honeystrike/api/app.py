@@ -13,8 +13,8 @@ from fastapi.templating import Jinja2Templates
 
 from honeystrike.api import auth, stix, taxii, ws
 from honeystrike.api.routers import (
-    admin, defender, duels, health, lessons, play, profile, progress, replay,
-    sessions, stats,
+    admin, arena, defender, duels, health, lessons, play, profile, progress,
+    replay, sessions, stats,
 )
 from honeystrike.config import get_settings
 from honeystrike.core.logging import configure_logging, get_logger
@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(progress.router)
     app.include_router(admin.router)
     app.include_router(duels.router)
+    app.include_router(arena.router)
 
     # ---- Dashboard UI -----------------------------------------------------
     if _STATIC_DIR.is_dir():
@@ -161,6 +162,12 @@ def create_app() -> FastAPI:
         if templates is None:
             return HTMLResponse("<h1>HoneyStrike</h1>")
         return templates.TemplateResponse(request, "duel.html", {})
+
+    @app.get("/play/arena", response_class=HTMLResponse, include_in_schema=False)
+    async def dashboard_play_arena(request: Request) -> HTMLResponse:
+        if templates is None:
+            return HTMLResponse("<h1>HoneyStrike</h1>")
+        return templates.TemplateResponse(request, "arena.html", {})
 
     @app.get("/play/attack/{lesson_id}", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard_play_attack_lesson(request: Request, lesson_id: str) -> HTMLResponse:

@@ -1,0 +1,21 @@
+{% extends "_base.html" %}
+{% block title %}PvP Arena — HoneyStrike{% endblock %}
+{% block content %}
+  <section class="arena-page">
+    <header class="page-header">
+      <h1>🎯 Open PvP arena</h1>
+      <a class="muted" href="/play">&larr; back to Play</a>
+    </header>
+
+    <p class="muted">Free-for-all. While a SOC Lead has the window open, anyone can
+      fire scenario waves at the shared honeypot — and anyone can race to label a
+      wave's MITRE technique. First correct label blocks it and scores you (10 pts);
+      waves that survive the window score whoever fired them.</p>
+
+    <div id="arena-admin" hidden></div>
+    <section id="arena-state"><p class="muted">Loading…</p></section>
+  </section>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/arena.js"></script>
+{% endblock %}
