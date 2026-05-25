@@ -11,17 +11,17 @@ packages = [{ include = "honeystrike", from = "src" }]
 python = "^3.13"
 
 # Web / API
-fastapi = "^0.115.0"
-uvicorn = { extras = ["standard"], version = "^0.32.0" }
+fastapi = ">=0.115,<0.137"
+uvicorn = { extras = ["standard"], version = ">=0.32,<0.49" }
 pydantic = "^2.9.0"
 pydantic-settings = "^2.6.0"
-python-multipart = "^0.0.20"
+python-multipart = ">=0.0.20,<0.0.30"
 jinja2 = "^3.1.4"
 
 # Async ORM + migrations
 sqlalchemy = { extras = ["asyncio"], version = "^2.0.36" }
 alembic = "^1.14.0"
-asyncpg = "^0.30.0"
+asyncpg = ">=0.30,<0.32"
 greenlet = "^3.1.1"
 
 # Event bus
@@ -51,14 +51,14 @@ weasyprint = "^63.0"
 
 # Observability
 structlog = "^24.4.0"
-prometheus-client = "^0.21.0"
+prometheus-client = ">=0.21,<0.26"
 
 # Misc
 python-dateutil = "^2.9.0"
 tenacity = "^9.0.0"
 
 # CLI + multiplayer (Phase 6)
-typer = "^0.15.0"
+typer = ">=0.15,<0.26"
 tomli-w = "^1.0.0"
 websockets = "^14.0"
 
@@ -72,7 +72,7 @@ pytest-cov = "^6.0.0"
 pytest-benchmark = "^5.0.0"
 httpx = "^0.28.0"
 mypy = "^1.13.0"
-ruff = "^0.8.0"
+ruff = ">=0.8,<0.16"
 black = "^24.10.0"
 bandit = "^1.7.10"
 pip-audit = "^2.7.3"
